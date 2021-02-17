@@ -1,3 +1,5 @@
+*.png
+
 *.annot
 *.cmo
 *.cma
