@@ -1,3 +1,5 @@
 open! Base
 
-type t = float * float * float
+type t = V3.t
+
+let create = V3.create
