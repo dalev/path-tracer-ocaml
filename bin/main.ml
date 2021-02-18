@@ -145,7 +145,7 @@ let main args =
   printf "#spheres = %d\n" (List.length spheres);
   let update_progress =
     if no_progress then None
-    else Some (fun pct -> printf "\rProgress: %3.1f%%" pct)
+    else Some (fun pct -> printf "\rProgress: %3.1f%%%!" pct)
   in
   Integrator.render ?update_progress i
     (Scene.create (camera (width // height)) spheres ~background);
