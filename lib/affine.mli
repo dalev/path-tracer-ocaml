@@ -1,3 +1,5 @@
+open Base
+
 type p3
 
 module V3 : sig
@@ -23,7 +25,11 @@ module V3 : sig
 
   val scale : t -> float -> t
 
+  val lerp : float -> t -> t -> t
+
   val normalize : t -> t
+
+  val of_float : float -> t
 
   val of_points : src:p3 -> tgt:p3 -> t
 

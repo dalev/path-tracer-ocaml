@@ -41,9 +41,13 @@ module V3 = struct
     let ( ~- ) = map ~f:( ~-. )
   end
 
+  let of_float x = return x
+
   let of_points ~src ~tgt = Infix.( - ) tgt src
 
   let scale v s = map ~f:(( *. ) s) v
+
+  let lerp t v w = Infix.( + ) (scale v (1.0 -. t)) (scale w t)
 
   let dot v w =
     let open Infix in

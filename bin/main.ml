@@ -32,11 +32,11 @@ let color_space = Bimage.rgb
 
 let mkImage width height = Image.v Bimage.f64 color_space width height
 
-let camera =
+let camera aspect =
   let eye = P3.create ~x:13.0 ~y:2.0 ~z:4.5 in
   let target = P3.origin in
   let up = V3.unit_y in
-  Camera.create ~eye ~target ~up ~vertical_fov_deg:20.0
+  Camera.create ~eye ~target ~up ~aspect ~vertical_fov_deg:20.0
 
 module Shirley_spheres = struct
   let p3 x y z = P3.create ~x ~y ~z
@@ -91,6 +91,13 @@ module Shirley_spheres = struct
           List.filter_map rng ~f:(fun b -> small_sphere a b))
 end
 
+let background ray =
+  let one = V3.of_float 1.0 in
+  let escape_color = V3.create ~x:0.5 ~y:0.7 ~z:1.0 in
+  let d = V3.normalize (Ray.direction ray) in
+  let t = 0.5 *. (V3.dot d V3.unit_y +. 1.0) in
+  Color.of_v3 (V3.lerp t one escape_color)
+
 let main args =
   let { Args.width; height; spp = _; output } = args in
   let img = mkImage width height in
@@ -107,7 +114,8 @@ let main args =
     Shirley_spheres.spheres ()
   in
   printf "Created %d spheres\n" (List.length spheres);
-  Integrator.render i (Scene.create camera spheres);
+  Integrator.render i
+    (Scene.create (camera (width // height)) spheres ~background);
   (match Bimage_io.write output img with
   | Ok () -> ()
   | Error (`File_not_found f) -> printf "File not found: %s" f

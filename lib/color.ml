@@ -7,3 +7,5 @@ let create ~r ~g ~b = { r; g; b }
 let of_v3 v =
   let r, g, b = V3.coords v in
   { r; g; b }
+
+let rgb c = (c.r, c.g, c.b)

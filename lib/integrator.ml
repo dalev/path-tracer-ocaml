@@ -40,25 +40,29 @@ module Tile = struct
   let create ~width ~height = { row = 0; col = 0; width; height }
 end
 
-let render_tile tile write_pixel widthf heightf =
+let render_tile t tile scene write_pixel =
   let x0 = tile.Tile.col in
   let y0 = tile.Tile.row in
-  let g = 0.0 in
   for y = y0 to y0 + tile.Tile.height do
-    let b = Float.of_int y /. heightf in
+    let cy = (t.height - 1 - y) // t.height in
     for x = x0 to x0 + tile.Tile.width do
-      let r = Float.of_int x /. widthf in
+      let cx = x // t.width in
+      let ray = Scene.camera_ray scene cx cy in
+      let color =
+        match Scene.intersect scene ray with
+        | None -> Scene.background scene ray
+        | Some _ -> Color.create ~r:0.7 ~g:0.1 ~b:0.2
+      in
+      let r, g, b = Color.rgb color in
       write_pixel ~x ~y ~r ~g ~b
     done
   done
 
-let render t _scene =
-  let widthf = Float.of_int t.width in
-  let heightf = Float.of_int t.height in
+let render t scene =
   let max_area = 32 * 32 in
   let tiles =
     Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height)
   in
   List.iter tiles ~f:(fun tile ->
       let _bvh_counters = () in
-      render_tile tile t.write_pixel widthf heightf)
+      render_tile t tile scene t.write_pixel)
