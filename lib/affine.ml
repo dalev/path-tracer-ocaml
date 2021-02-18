@@ -9,6 +9,8 @@ module V3 = struct
 
   let create ~x ~y ~z = (x, y, z)
 
+  let coords = Fn.id
+
   let zero = create ~x:0.0 ~y:0.0 ~z:0.0
 
   let unit_x = create ~x:1.0 ~y:1.0 ~z:0.0
@@ -66,4 +68,6 @@ module P3 = struct
   let origin = V3.zero
 
   let to_v3 = Fn.id
+
+  let of_v3 = Fn.id
 end

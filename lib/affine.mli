@@ -5,6 +5,8 @@ module V3 : sig
 
   val create : x:float -> y:float -> z:float -> t
 
+  val coords : t -> float * float * float
+
   val zero : t
 
   val unit_x : t
@@ -46,4 +48,6 @@ module P3 : sig
   val origin : t
 
   val to_v3 : t -> V3.t
+
+  val of_v3 : V3.t -> t
 end

@@ -1,3 +1,3 @@
 type t
 
-val create : unit -> t
+val create : Camera.t -> Shape.t list -> t
