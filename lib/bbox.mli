@@ -2,6 +2,8 @@ type t
 
 val create : min:P3.t -> max:P3.t -> t
 
+val is_hit : t -> Ray.t -> t_min:float -> t_max:float -> bool
+
 val min : t -> P3.t
 
 val max : t -> P3.t

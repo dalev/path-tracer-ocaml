@@ -53,6 +53,10 @@ module V3 = struct
 
   let scale v s = map ~f:(( *. ) s) v
 
+  let min_coord (x, y, z) = Float.min x (Float.min y z)
+
+  let max_coord (x, y, z) = Float.max x (Float.max y z)
+
   let lerp t v w = Infix.( + ) (scale v (1.0 -. t)) (scale w t)
 
   let dot v w =

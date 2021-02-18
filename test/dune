@@ -1,2 +1,3 @@
 (test
- (name path_tracer))
+ (name path_tracer_test)
+ (libraries path_tracer base))

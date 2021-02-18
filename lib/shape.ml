@@ -15,7 +15,7 @@ module Geometry = struct
           ~min:(P3.translate center V3.Infix.(~-r))
           ~max:(P3.translate center r)
 
-  let intersect t ray t_min t_max =
+  let intersect t ray ~t_min ~t_max =
     match t with
     | Sphere { center; radius } ->
         let open Float.O in
@@ -45,6 +45,7 @@ let sphere ~material ~center ~radius =
 
 let transform t ~f = { t with geometry = Geometry.transform t.geometry ~f }
 
-let intersect t ray t_min t_max = Geometry.intersect t.geometry ray t_min t_max
+let intersect t ray ~t_min ~t_max =
+  Geometry.intersect t.geometry ray ~t_min ~t_max
 
 let bbox t = Geometry.bbox t.geometry

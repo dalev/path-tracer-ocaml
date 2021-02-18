@@ -9,6 +9,10 @@ module V3 : sig
 
   val coords : t -> float * float * float
 
+  val min_coord : t -> float
+
+  val max_coord : t -> float
+
   val yzx : t -> t
 
   val zero : t
@@ -36,6 +40,8 @@ module V3 : sig
   val of_float : float -> t
 
   val of_points : src:p3 -> tgt:p3 -> t
+
+  val map : t -> f:(float -> float) -> t
 
   val map2 : t -> t -> f:(float -> float -> float) -> t
 
