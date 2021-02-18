@@ -5,13 +5,20 @@ module Image = Bimage.Image
 module Pixel = Bimage.Pixel
 
 module Args = struct
-  type t = { width : int; height : int; spp : int; output : string }
+  type t = {
+    width : int;
+    height : int;
+    spp : int;
+    output : string;
+    no_progress : bool;
+  }
 
   let parse () =
     let width = ref 600 in
     let height = ref 300 in
     let spp = ref 1 in
     let file = ref "shirley-spheres.png" in
+    let no_progress = ref false in
     let usage_msg =
       Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width
         !height !file
@@ -22,10 +29,17 @@ module Args = struct
         ("-height", Set_int height, "<integer> image height");
         ("-samples-per-pixel", Set_int spp, "<integer> samples-per-pixel");
         ("-o", Set_string file, "<file> output file");
+        ("-no-progress", Set no_progress, "suppress progress monitor");
       ]
       (fun (_ : string) -> failwith "No anonymous arguments expected")
       usage_msg;
-    { width = !width; height = !height; spp = !spp; output = !file }
+    {
+      width = !width;
+      height = !height;
+      spp = !spp;
+      output = !file;
+      no_progress = !no_progress;
+    }
 end
 
 let color_space = Bimage.rgb
@@ -99,7 +113,7 @@ let background ray =
   Color.of_v3 (V3.lerp t one escape_color)
 
 let main args =
-  let { Args.width; height; spp = _; output } = args in
+  let { Args.width; height; spp; output; no_progress } = args in
   let img = mkImage width height in
   let write_pixel ~x ~y ~r ~g ~b =
     let px = Pixel.empty Bimage.rgb in
@@ -114,8 +128,13 @@ let main args =
     Shirley_spheres.spheres ()
   in
   printf "Created %d spheres\n" (List.length spheres);
-  Integrator.render i
+  let update_progress =
+    if no_progress then None
+    else Some (fun pct -> printf "\rProgress: %3.1f %%%!" pct)
+  in
+  Integrator.render ?update_progress i ~samples_per_pixel:spp
     (Scene.create (camera (width // height)) spheres ~background);
+  printf "\n";
   (match Bimage_io.write output img with
   | Ok () -> ()
   | Error (`File_not_found f) -> printf "File not found: %s" f

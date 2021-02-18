@@ -11,6 +11,8 @@ module V3 = struct
 
   let coords = Fn.id
 
+  let yzx (x, y, z) = (y, z, x)
+
   let zero = create ~x:0.0 ~y:0.0 ~z:0.0
 
   let unit_x = create ~x:1.0 ~y:1.0 ~z:0.0
@@ -19,7 +21,9 @@ module V3 = struct
 
   let unit_z = create ~x:0.0 ~y:1.0 ~z:1.0
 
-  include Applicative.Make (struct
+  let axis (x, y, z) a = match (a : Axis.t) with X -> x | Y -> y | Z -> z
+
+  module A = Applicative.Make (struct
     type 'a t = 'a poly
 
     let return a = (a, a, a)
@@ -28,6 +32,8 @@ module V3 = struct
 
     let map = `Custom (fun (a, b, c) ~f -> (f a, f b, f c))
   end)
+
+  include A
 
   module Infix = struct
     let ( + ) = map2 ~f:( +. )
@@ -65,13 +71,13 @@ module V3 = struct
 end
 
 module P3 = struct
-  type t = p3
-
-  let create = V3.create
+  include V3
 
   let origin = V3.zero
 
   let to_v3 = Fn.id
 
   let of_v3 = Fn.id
+
+  let translate t v = V3.Infix.(t + v)
 end

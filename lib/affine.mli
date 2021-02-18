@@ -9,6 +9,8 @@ module V3 : sig
 
   val coords : t -> float * float * float
 
+  val yzx : t -> t
+
   val zero : t
 
   val unit_x : t
@@ -16,6 +18,8 @@ module V3 : sig
   val unit_y : t
 
   val unit_z : t
+
+  val axis : t -> Axis.t -> float
 
   val quadrance : t -> float
 
@@ -32,6 +36,8 @@ module V3 : sig
   val of_float : float -> t
 
   val of_points : src:p3 -> tgt:p3 -> t
+
+  val map2 : t -> t -> f:(float -> float -> float) -> t
 
   module Infix : sig
     val ( + ) : t -> t -> t
@@ -51,9 +57,31 @@ module P3 : sig
 
   val create : x:float -> y:float -> z:float -> t
 
+  val coords : t -> float * float * float
+
+  val axis : t -> Axis.t -> float
+
   val origin : t
+
+  val translate : t -> V3.t -> t
 
   val to_v3 : t -> V3.t
 
   val of_v3 : V3.t -> t
+
+  val scale : t -> float -> t
+
+  val map2 : t -> t -> f:(float -> float -> float) -> t
+
+  module Infix : sig
+    val ( + ) : t -> t -> t
+
+    val ( - ) : t -> t -> t
+
+    val ( * ) : t -> t -> t
+
+    val ( / ) : t -> t -> t
+
+    val ( ~- ) : t -> t
+  end
 end

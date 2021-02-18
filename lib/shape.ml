@@ -7,6 +7,14 @@ module Geometry = struct
     match t with
     | Sphere { center; radius } -> Sphere { center = f center; radius }
 
+  let bbox t =
+    match t with
+    | Sphere { center; radius } ->
+        let r = V3.of_float radius in
+        Bbox.create
+          ~min:(P3.translate center V3.Infix.(~-r))
+          ~max:(P3.translate center r)
+
   let intersect t ray t_min t_max =
     match t with
     | Sphere { center; radius } ->
@@ -38,3 +46,5 @@ let sphere ~material ~center ~radius =
 let transform t ~f = { t with geometry = Geometry.transform t.geometry ~f }
 
 let intersect t ray t_min t_max = Geometry.intersect t.geometry ray t_min t_max
+
+let bbox t = Geometry.bbox t.geometry

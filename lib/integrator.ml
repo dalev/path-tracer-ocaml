@@ -1,4 +1,6 @@
 open! Base
+module Task = Domainslib.Task
+module Channel = Domainslib.Chan
 
 type t = {
   width : int;
@@ -62,19 +64,42 @@ let render_tile t tile scene write_pixel =
     done
   done
 
-let render t scene =
-  let module Task = Domainslib.Task in
+type tick = Tick | Done
+
+let spawn_ticker update_progress channel num_tiles =
+  let module Domain = Caml.Domain in
+  let d =
+    Domain.spawn (fun () ->
+        let rec loop count =
+          match Channel.recv channel with
+          | Tick ->
+              let count' = count + 1 in
+              update_progress (count' // num_tiles);
+              loop count'
+          | Done -> ()
+        in
+        loop 0)
+  in
+  fun () -> Domain.join d
+
+let render ?(update_progress = ignore) ~samples_per_pixel:_ t scene =
   let max_area = 32 * 32 in
   let tiles =
     Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height)
   in
-  let pool = Task.setup_pool ~num_domains:7 in
+  let num_domains = 8 in
+  let pool = Task.setup_pool ~num_domains in
+  let channel = Channel.make_bounded num_domains in
+  let join_ticker = spawn_ticker update_progress channel (List.length tiles) in
   let tasks =
     List.map tiles ~f:(fun tile ->
         let _bvh_counters = () in
         Task.async pool (fun () ->
             let _tile_sampler = () in
-            render_tile t tile scene t.write_pixel))
+            render_tile t tile scene t.write_pixel;
+            Channel.send channel Tick))
   in
   List.fold tasks ~init:() ~f:(fun () promise -> Task.await pool promise);
+  Channel.send channel Done;
+  join_ticker ();
   Task.teardown_pool pool
