@@ -135,28 +135,25 @@ let spawn_ticker update_progress channel num_tiles =
   in
   fun () -> Domain.join d
 
-let create_sampler t = Low_discrepancy.create (2 + (2 * (t.max_bounces + 1)))
+let create_tile_samplers t tiles =
+  let s = ref (Low_discrepancy.create (2 + (2 * (t.max_bounces + 1)))) in
+  List.map tiles ~f:(fun tile ->
+      let n = t.samples_per_pixel * Tile.area tile in
+      let tile_sampler, suffix = Low_discrepancy.split_at !s n in
+      s := suffix;
+      (tile, tile_sampler))
 
-let render_parallel ?(update_progress = ignore) t scene tiles =
-  let num_tiles = List.length tiles in
+let render_parallel ?(update_progress = ignore) t scene tiles_and_samplers =
+  let num_tiles = List.length tiles_and_samplers in
   let num_domains = 8 in
   let pool = Task.setup_pool ~num_domains in
   let channel = Channel.make_bounded num_domains in
   let join_ticker = spawn_ticker update_progress channel num_tiles in
   let tasks =
-    let sampler = ref (create_sampler t) in
-    let tile_samplers =
-      List.map tiles ~f:(fun tile ->
-          let n = t.samples_per_pixel * Tile.area tile in
-          let prefix, suffix = Low_discrepancy.split_at !sampler n in
-          sampler := suffix;
-          prefix)
-    in
-    List.map2_exn tiles tile_samplers ~f:(fun tile tile_sampler ->
+    List.map tiles_and_samplers ~f:(fun (tile, sampler) ->
         let _bvh_counters = () in
         Task.async pool (fun () ->
-            let _tile_sampler = () in
-            render_tile t tile scene t.write_pixel tile_sampler;
+            render_tile t tile scene t.write_pixel sampler;
             Channel.send channel Tick))
   in
   List.fold tasks ~init:() ~f:(fun () promise -> Task.await pool promise);
@@ -170,17 +167,12 @@ let render ?(update_progress = ignore) t scene =
     Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height)
   in
   let num_tiles = List.length tiles in
+  let tiles_and_samplers = create_tile_samplers t tiles in
   printf "#tiles = %d\n" num_tiles;
-  if t.max_threads > 1 then render_parallel ~update_progress t scene tiles
+  if t.max_threads > 1 then
+    render_parallel ~update_progress t scene tiles_and_samplers
   else
-    let sampler = ref (create_sampler t) in
-    List.iteri tiles ~f:(fun i tile ->
+    List.iteri tiles_and_samplers ~f:(fun i (tile, sampler) ->
         let _bvh_counters = () in
-        let _tile_sampler = () in
-        let tile_sampler, suffix =
-          Low_discrepancy.split_at !sampler
-            (t.samples_per_pixel * Tile.area tile)
-        in
-        sampler := suffix;
-        render_tile t tile scene t.write_pixel tile_sampler;
+        render_tile t tile scene t.write_pixel sampler;
         update_progress ((i + 1) * 100 // num_tiles))
