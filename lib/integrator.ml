@@ -59,4 +59,6 @@ let render t _scene =
   let tiles =
     Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height)
   in
-  List.iter tiles ~f:(fun tile -> render_tile tile t.write_pixel widthf heightf)
+  List.iter tiles ~f:(fun tile ->
+      let _bvh_counters = () in
+      render_tile tile t.write_pixel widthf heightf)

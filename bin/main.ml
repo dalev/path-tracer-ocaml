@@ -29,10 +29,19 @@ module Args = struct
     { width = !width; height = !height; spp = !spp; output = !file }
 end
 
+let color_space = Bimage.rgb
+
+let mkImage width height = Image.v Bimage.f64 color_space width height
+
+let _camera =
+  let eye = P3.create ~x:13.0 ~y:2.0 ~z:4.5 in
+  let target = P3.origin in
+  let up = V3.unit_y in
+  Camera.create ~eye ~target ~up
+
 let main args =
   let { Args.width; height; spp = _; output } = args in
-  let color_space = Bimage.rgb in
-  let img = Image.v Bimage.f64 color_space width height in
+  let img = mkImage width height in
   let write_pixel ~x ~y ~r ~g ~b =
     let px = Pixel.empty Bimage.rgb in
     Pixel.set px 0 r;
