@@ -51,7 +51,11 @@ let render_tile t tile scene write_pixel =
       let color =
         match Scene.intersect scene ray with
         | None -> Scene.background scene ray
-        | Some _ -> Color.create ~r:0.7 ~g:0.1 ~b:0.2
+        | Some h -> (
+            match (Hit.scatter h : Scatter.t) with
+            | Absorb -> failwith "Absorb"
+            | Specular -> failwith "Specular"
+            | Diffuse attenuation -> attenuation)
       in
       let r, g, b = Color.rgb color in
       write_pixel ~x ~y ~r ~g ~b

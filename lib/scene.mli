@@ -6,4 +6,4 @@ val camera_ray : t -> float -> float -> Ray.t
 
 val background : t -> Ray.t -> Color.t
 
-val intersect : t -> Ray.t -> float option
+val intersect : t -> Ray.t -> Hit.t option

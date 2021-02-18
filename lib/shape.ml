@@ -30,6 +30,8 @@ end
 
 type t = { material : Material.t; geometry : Geometry.t }
 
+let material t = t.material
+
 let sphere ~material ~center ~radius =
   { material; geometry = Geometry.Sphere { center; radius } }
 
