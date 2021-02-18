@@ -2,10 +2,20 @@ open Base
 
 type t = Leaf of Shape.t | Branch of Bbox.t * t * t
 
+module Slice = struct
+  include Array
+
+  let create = Fn.id
+
+  let partition_in_place t p to_bin = partition_tf t ~f:(fun e -> to_bin e <= p)
+end
+
 module Bshape = struct
   type t = { shape : Shape.t; bbox : Bbox.t; centroid : P3.t }
 
   let bbox t = t.bbox
+
+  let cbox t = Bbox.create ~min:t.centroid ~max:t.centroid
 
   let centroid t = t.centroid
 
@@ -63,8 +73,8 @@ let costT = 0.25
 let leaf_cost n = costI *. Float.of_int n
 
 let centroid_bbox bshapes =
-  let init = Bshape.bbox (Slice.get bshapes 0) in
-  Slice.fold bshapes ~init ~f:(fun acc b -> Bbox.union acc (Bshape.bbox b))
+  let init = Bshape.cbox (Slice.get bshapes 0) in
+  Slice.fold bshapes ~init ~f:(fun acc b -> Bbox.union acc (Bshape.cbox b))
 
 let create shapes =
   let bins = Array.init num_bins ~f:(fun (_ : int) -> Bin.create ()) in

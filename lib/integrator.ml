@@ -1,4 +1,5 @@
 open! Base
+open! Stdio
 module Task = Domainslib.Task
 module Channel = Domainslib.Chan
 
@@ -82,15 +83,17 @@ let spawn_ticker update_progress channel num_tiles =
   in
   fun () -> Domain.join d
 
-let render ?(update_progress = ignore) ~samples_per_pixel:_ t scene =
+let _render_parallel ?(update_progress = ignore) ~samples_per_pixel:_ t scene =
   let max_area = 32 * 32 in
   let tiles =
     Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height)
   in
+  let num_tiles = List.length tiles in
+  printf "#tiles = %d\n" num_tiles;
   let num_domains = 8 in
   let pool = Task.setup_pool ~num_domains in
   let channel = Channel.make_bounded num_domains in
-  let join_ticker = spawn_ticker update_progress channel (List.length tiles) in
+  let join_ticker = spawn_ticker update_progress channel num_tiles in
   let tasks =
     List.map tiles ~f:(fun tile ->
         let _bvh_counters = () in
@@ -103,3 +106,16 @@ let render ?(update_progress = ignore) ~samples_per_pixel:_ t scene =
   Channel.send channel Done;
   join_ticker ();
   Task.teardown_pool pool
+
+let render ?(update_progress = ignore) ~samples_per_pixel:_ t scene =
+  let max_area = 32 * 32 in
+  let tiles =
+    Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height)
+  in
+  let num_tiles = List.length tiles in
+  printf "#tiles = %d\n" num_tiles;
+  List.iteri tiles ~f:(fun i tile ->
+      let _bvh_counters = () in
+      let _tile_sampler = () in
+      render_tile t tile scene t.write_pixel;
+      update_progress ((i + 1) * 100 // num_tiles))
