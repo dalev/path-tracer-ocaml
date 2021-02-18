@@ -8,11 +8,13 @@ type t = {
   height : int;
   write_pixel : x:int -> y:int -> r:float -> g:float -> b:float -> unit;
   samples_per_pixel : int;
+  max_bounces : int;
   max_threads : int;
 }
 
-let create ~width ~height ~write_pixel ~samples_per_pixel ~max_threads =
-  { width; height; write_pixel; samples_per_pixel; max_threads }
+let create ~width ~height ~write_pixel ~samples_per_pixel ~max_bounces
+    ~max_threads =
+  { width; height; write_pixel; samples_per_pixel; max_bounces; max_threads }
 
 module Tile = struct
   type t = { row : int; col : int; width : int; height : int }
@@ -46,23 +48,58 @@ module Tile = struct
   let create ~width ~height = { row = 0; col = 0; width; height }
 end
 
+let trace_ray ray scene max_bounces =
+  let diffuse_plus_light = Scene.diffuse_plus_light_pdf scene in
+  let rec loop ray max_bounces =
+    if max_bounces <= 0 then Color.black
+    else
+      match Scene.intersect scene ray with
+      | None -> Scene.background scene ray
+      | Some h -> (
+          let emit = Hit.emit h in
+          (* CR dalev: sampler *)
+          let u = 0.23 in
+          let v = 0.79 in
+          match (Hit.scatter h : Scatter.t) with
+          | Absorb -> emit
+          | Specular (scattered_ray, attenuation) ->
+              let open Color.Infix in
+              emit + (attenuation * loop scattered_ray (max_bounces - 1))
+          | Diffuse attenuation ->
+              let open Color.Infix in
+              let ss = Hit.shader_space h in
+              let dir = Pdf.sample diffuse_plus_light ss u v in
+              let diffuse_pd = Pdf.eval Pdf.diffuse dir ss in
+              if Float.( = ) diffuse_pd 0.0 then emit
+              else
+                let divisor = Pdf.eval diffuse_plus_light dir ss in
+                let pd = diffuse_pd /. divisor in
+                if not (Float.is_finite pd) then emit
+                else
+                  let scattered_ray =
+                    Ray.create (Hit.point h) (Shader_space.rotate_inv ss dir)
+                  in
+                  emit
+                  + Color.scale attenuation pd
+                    * loop scattered_ray (max_bounces - 1))
+  in
+  loop ray max_bounces
+
 let render_tile t tile scene write_pixel =
   let x0 = tile.Tile.col in
   let y0 = tile.Tile.row in
+  let widthf = 1.0 /. Float.of_int t.width in
+  let heightf = 1.0 /. Float.of_int t.height in
   for y = y0 to y0 + tile.Tile.height do
-    let cy = (t.height - 1 - y) // t.height in
+    let yf = Float.of_int (t.height - 1 - y) in
     for x = x0 to x0 + tile.Tile.width do
-      let cx = x // t.width in
+      let xf = Float.of_int x in
+      (* CR dalev: sampler *)
+      let dx = 0.5 and dy = 0.5 in
+      let cx = (xf +. dx) *. widthf in
+      let cy = (yf +. dy) *. heightf in
       let ray = Scene.camera_ray scene cx cy in
-      let color =
-        match Scene.intersect scene ray with
-        | None -> Scene.background scene ray
-        | Some h -> (
-            match (Hit.scatter h : Scatter.t) with
-            | Absorb -> failwith "Absorb"
-            | Specular -> failwith "Specular"
-            | Diffuse attenuation -> attenuation)
-      in
+      let color = trace_ray ray scene t.max_bounces in
       let r, g, b = Color.rgb color in
       write_pixel ~x ~y ~r ~g ~b
     done

@@ -11,6 +11,7 @@ module Args = struct
     spp : int;
     output : string;
     no_progress : bool;
+    max_bounces : int;
     max_threads : int;
   }
 
@@ -20,6 +21,7 @@ module Args = struct
     let spp = ref 1 in
     let file = ref "shirley-spheres.png" in
     let no_progress = ref false in
+    let max_bounces = ref 4 in
     let max_threads = ref 1 in
     let usage_msg =
       Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width
@@ -32,6 +34,7 @@ module Args = struct
         ("-samples-per-pixel", Set_int spp, "<integer> samples-per-pixel");
         ("-o", Set_string file, "<file> output file");
         ("-no-progress", Set no_progress, "suppress progress monitor");
+        ("-max-bounces", Set_int max_bounces, "<integer> max ray bounces");
         ("-max-threads", Set_int max_threads, "<integer> max threads");
       ]
       (fun (_ : string) -> failwith "No anonymous arguments expected")
@@ -42,6 +45,7 @@ module Args = struct
       spp = !spp;
       output = !file;
       no_progress = !no_progress;
+      max_bounces = !max_bounces;
       max_threads = !max_threads;
     }
 end
@@ -117,7 +121,10 @@ let background ray =
   Color.of_v3 (V3.lerp t one escape_color)
 
 let main args =
-  let { Args.width; height; spp; output; no_progress; max_threads } = args in
+  let { Args.width; height; spp; output; no_progress; max_bounces; max_threads }
+      =
+    args
+  in
   let img = mkImage width height in
   let write_pixel ~x ~y ~r ~g ~b =
     let px = Pixel.empty Bimage.rgb in
@@ -127,7 +134,7 @@ let main args =
     Image.set_pixel img x y px
   in
   let i =
-    Integrator.create ~width ~height ~write_pixel ~max_threads
+    Integrator.create ~width ~height ~write_pixel ~max_threads ~max_bounces
       ~samples_per_pixel:spp
   in
   let spheres =

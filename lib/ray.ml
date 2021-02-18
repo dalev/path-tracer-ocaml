@@ -9,3 +9,6 @@ let origin t = t.origin
 let direction t = t.direction
 
 let direction_inv t = t.direction_inv
+
+let point_at ray time =
+  P3.translate (origin ray) @@ V3.scale (direction ray) time

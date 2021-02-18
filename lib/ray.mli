@@ -7,3 +7,5 @@ val origin : t -> P3.t
 val direction : t -> V3.t
 
 val direction_inv : t -> V3.t
+
+val point_at : t -> float -> P3.t

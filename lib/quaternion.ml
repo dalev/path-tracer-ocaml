@@ -1,5 +1,7 @@
 type t = { r : float; v : V3.t }
 
+let create r v = { r; v }
+
 let id = { r = 1.0; v = V3.zero }
 
 let rotation axis angle =

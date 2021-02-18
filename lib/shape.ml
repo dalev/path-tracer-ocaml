@@ -15,6 +15,22 @@ module Geometry = struct
           ~min:(P3.translate center V3.Infix.(~-r))
           ~max:(P3.translate center r)
 
+  let normal t pt =
+    match t with
+    | Sphere { center; radius = _ } ->
+        V3.normalize @@ V3.of_points ~src:center ~tgt:pt
+
+  let tex_coord t _surface_pt normal =
+    let open Float.O in
+    match t with
+    | Sphere { center = _; radius = _ } ->
+        let x, y, z = V3.coords normal in
+        let phi = Float.acos (-y) in
+        let theta = Float.pi + Float.atan2 (-z) x in
+        let u = phi / (2.0 * Float.pi) in
+        let v = theta / Float.pi in
+        Texture.Coord.create u v
+
   let intersect t ray ~t_min ~t_max =
     match t with
     | Sphere { center; radius } ->
@@ -49,3 +65,7 @@ let intersect t ray ~t_min ~t_max =
   Geometry.intersect t.geometry ray ~t_min ~t_max
 
 let bbox t = Geometry.bbox t.geometry
+
+let normal t pt = Geometry.normal t.geometry pt
+
+let tex_coord t ~surface ~normal = Geometry.tex_coord t.geometry surface normal

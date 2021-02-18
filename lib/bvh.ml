@@ -172,4 +172,4 @@ let intersect t ray ~t_min ~t_max =
   in
   match loop t t_max with
   | None -> None
-  | Some (t_hit, shape) -> Some (Hit.create ~t_hit shape)
+  | Some (t_hit, shape) -> Some (Hit.create ~t_hit shape ray)
