@@ -2,6 +2,7 @@ open Base
 
 type t = Leaf of Shape.t | Branch of Bbox.t * t * t
 
+(*
 module Slice = struct
   include Array
 
@@ -9,6 +10,7 @@ module Slice = struct
 
   let partition_in_place t p to_bin = partition_tf t ~f:(fun e -> to_bin e <= p)
 end
+*)
 
 module Bshape = struct
   type t = { shape : Shape.t; bbox : Bbox.t; centroid : P3.t }

@@ -11,6 +11,7 @@ module Args = struct
     spp : int;
     output : string;
     no_progress : bool;
+    max_threads : int;
   }
 
   let parse () =
@@ -19,6 +20,7 @@ module Args = struct
     let spp = ref 1 in
     let file = ref "shirley-spheres.png" in
     let no_progress = ref false in
+    let max_threads = ref 1 in
     let usage_msg =
       Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width
         !height !file
@@ -30,6 +32,7 @@ module Args = struct
         ("-samples-per-pixel", Set_int spp, "<integer> samples-per-pixel");
         ("-o", Set_string file, "<file> output file");
         ("-no-progress", Set no_progress, "suppress progress monitor");
+        ("-max-threads", Set_int max_threads, "<integer> max threads");
       ]
       (fun (_ : string) -> failwith "No anonymous arguments expected")
       usage_msg;
@@ -39,6 +42,7 @@ module Args = struct
       spp = !spp;
       output = !file;
       no_progress = !no_progress;
+      max_threads = !max_threads;
     }
 end
 
@@ -113,7 +117,7 @@ let background ray =
   Color.of_v3 (V3.lerp t one escape_color)
 
 let main args =
-  let { Args.width; height; spp; output; no_progress } = args in
+  let { Args.width; height; spp; output; no_progress; max_threads } = args in
   let img = mkImage width height in
   let write_pixel ~x ~y ~r ~g ~b =
     let px = Pixel.empty Bimage.rgb in
@@ -122,17 +126,21 @@ let main args =
     Pixel.set px 2 b;
     Image.set_pixel img x y px
   in
-  let i = Integrator.create ~width ~height ~write_pixel in
+  let i =
+    Integrator.create ~width ~height ~write_pixel ~max_threads
+      ~samples_per_pixel:spp
+  in
   let spheres =
     Random.init 42;
     Shirley_spheres.spheres ()
   in
-  printf "Created %d spheres\n" (List.length spheres);
+  printf "dim = %d x %d; #threads = %d\n" width height max_threads;
+  printf "#spheres = %d\n" (List.length spheres);
   let update_progress =
     if no_progress then None
-    else Some (fun pct -> printf "\rProgress: %3.1f %%%!" pct)
+    else Some (fun pct -> printf "\rProgress: %3.1f%%" pct)
   in
-  Integrator.render ?update_progress i ~samples_per_pixel:spp
+  Integrator.render ?update_progress i
     (Scene.create (camera (width // height)) spheres ~background);
   printf "\n";
   (match Bimage_io.write output img with

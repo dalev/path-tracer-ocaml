@@ -7,9 +7,12 @@ type t = {
   width : int;
   height : int;
   write_pixel : x:int -> y:int -> r:float -> g:float -> b:float -> unit;
+  samples_per_pixel : int;
+  max_threads : int;
 }
 
-let create ~width ~height ~write_pixel = { width; height; write_pixel }
+let create ~width ~height ~write_pixel ~samples_per_pixel ~max_threads =
+  { width; height; write_pixel; samples_per_pixel; max_threads }
 
 module Tile = struct
   type t = { row : int; col : int; width : int; height : int }
@@ -83,13 +86,8 @@ let spawn_ticker update_progress channel num_tiles =
   in
   fun () -> Domain.join d
 
-let _render_parallel ?(update_progress = ignore) ~samples_per_pixel:_ t scene =
-  let max_area = 32 * 32 in
-  let tiles =
-    Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height)
-  in
+let render_parallel ?(update_progress = ignore) t scene tiles =
   let num_tiles = List.length tiles in
-  printf "#tiles = %d\n" num_tiles;
   let num_domains = 8 in
   let pool = Task.setup_pool ~num_domains in
   let channel = Channel.make_bounded num_domains in
@@ -107,15 +105,17 @@ let _render_parallel ?(update_progress = ignore) ~samples_per_pixel:_ t scene =
   join_ticker ();
   Task.teardown_pool pool
 
-let render ?(update_progress = ignore) ~samples_per_pixel:_ t scene =
+let render ?(update_progress = ignore) t scene =
   let max_area = 32 * 32 in
   let tiles =
     Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height)
   in
   let num_tiles = List.length tiles in
   printf "#tiles = %d\n" num_tiles;
-  List.iteri tiles ~f:(fun i tile ->
-      let _bvh_counters = () in
-      let _tile_sampler = () in
-      render_tile t tile scene t.write_pixel;
-      update_progress ((i + 1) * 100 // num_tiles))
+  if t.max_threads > 1 then render_parallel ~update_progress t scene tiles
+  else
+    List.iteri tiles ~f:(fun i tile ->
+        let _bvh_counters = () in
+        let _tile_sampler = () in
+        render_tile t tile scene t.write_pixel;
+        update_progress ((i + 1) * 100 // num_tiles))
