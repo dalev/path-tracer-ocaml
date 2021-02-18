@@ -48,7 +48,15 @@ module Tile = struct
   let create ~width ~height = { row = 0; col = 0; width; height }
 end
 
-let trace_ray ray scene max_bounces =
+let trace_ray ray scene max_bounces samples =
+  let take_2d =
+    let samples_index = ref 2 in
+    fun () ->
+      let j = !samples_index in
+      let u = samples.(j) and v = samples.(j + 1) in
+      samples_index := j + 2;
+      (u, v)
+  in
   let diffuse_plus_light = Scene.diffuse_plus_light_pdf scene in
   let rec loop ray max_bounces =
     if max_bounces <= 0 then Color.black
@@ -57,9 +65,7 @@ let trace_ray ray scene max_bounces =
       | None -> Scene.background scene ray
       | Some h -> (
           let emit = Hit.emit h in
-          (* CR dalev: sampler *)
-          let u = 0.23 in
-          let v = 0.79 in
+          let u, v = take_2d () in
           match (Hit.scatter h : Scatter.t) with
           | Absorb -> emit
           | Specular (scattered_ray, attenuation) ->
@@ -85,22 +91,28 @@ let trace_ray ray scene max_bounces =
   in
   loop ray max_bounces
 
-let render_tile t tile scene write_pixel =
+let gamma = Color.map ~f:Float.sqrt
+
+let render_tile t tile scene write_pixel tile_sampler =
   let x0 = tile.Tile.col in
   let y0 = tile.Tile.row in
-  let widthf = 1.0 /. Float.of_int t.width in
-  let heightf = 1.0 /. Float.of_int t.height in
+  let widthf = 1 // t.width in
+  let heightf = 1 // t.height in
+  let spp_invf = 1 // t.samples_per_pixel in
   for y = y0 to y0 + tile.Tile.height do
     let yf = Float.of_int (t.height - 1 - y) in
     for x = x0 to x0 + tile.Tile.width do
       let xf = Float.of_int x in
-      (* CR dalev: sampler *)
-      let dx = 0.5 and dy = 0.5 in
-      let cx = (xf +. dx) *. widthf in
-      let cy = (yf +. dy) *. heightf in
-      let ray = Scene.camera_ray scene cx cy in
-      let color = trace_ray ray scene t.max_bounces in
-      let r, g, b = Color.rgb color in
+      let color = ref Color.black in
+      for _ = 1 to t.samples_per_pixel do
+        let s = Low_discrepancy.step tile_sampler in
+        let dx = s.(0) and dy = s.(1) in
+        let cx = (xf +. dx) *. widthf in
+        let cy = (yf +. dy) *. heightf in
+        let ray = Scene.camera_ray scene cx cy in
+        color := Color.Infix.( + ) !color @@ trace_ray ray scene t.max_bounces s
+      done;
+      let r, g, b = Color.rgb @@ gamma (Color.scale !color spp_invf) in
       write_pixel ~x ~y ~r ~g ~b
     done
   done
@@ -123,6 +135,8 @@ let spawn_ticker update_progress channel num_tiles =
   in
   fun () -> Domain.join d
 
+let create_sampler t = Low_discrepancy.create (2 + (2 * (t.max_bounces + 1)))
+
 let render_parallel ?(update_progress = ignore) t scene tiles =
   let num_tiles = List.length tiles in
   let num_domains = 8 in
@@ -130,11 +144,19 @@ let render_parallel ?(update_progress = ignore) t scene tiles =
   let channel = Channel.make_bounded num_domains in
   let join_ticker = spawn_ticker update_progress channel num_tiles in
   let tasks =
-    List.map tiles ~f:(fun tile ->
+    let sampler = ref (create_sampler t) in
+    let tile_samplers =
+      List.map tiles ~f:(fun tile ->
+          let n = t.samples_per_pixel * Tile.area tile in
+          let prefix, suffix = Low_discrepancy.split_at !sampler n in
+          sampler := suffix;
+          prefix)
+    in
+    List.map2_exn tiles tile_samplers ~f:(fun tile tile_sampler ->
         let _bvh_counters = () in
         Task.async pool (fun () ->
             let _tile_sampler = () in
-            render_tile t tile scene t.write_pixel;
+            render_tile t tile scene t.write_pixel tile_sampler;
             Channel.send channel Tick))
   in
   List.fold tasks ~init:() ~f:(fun () promise -> Task.await pool promise);
@@ -151,8 +173,14 @@ let render ?(update_progress = ignore) t scene =
   printf "#tiles = %d\n" num_tiles;
   if t.max_threads > 1 then render_parallel ~update_progress t scene tiles
   else
+    let sampler = ref (create_sampler t) in
     List.iteri tiles ~f:(fun i tile ->
         let _bvh_counters = () in
         let _tile_sampler = () in
-        render_tile t tile scene t.write_pixel;
+        let tile_sampler, suffix =
+          Low_discrepancy.split_at !sampler
+            (t.samples_per_pixel * Tile.area tile)
+        in
+        sampler := suffix;
+        render_tile t tile scene t.write_pixel tile_sampler;
         update_progress ((i + 1) * 100 // num_tiles))
