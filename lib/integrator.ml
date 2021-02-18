@@ -59,10 +59,18 @@ let render_tile t tile scene write_pixel =
   done
 
 let render t scene =
+  let module Task = Domainslib.Task in
   let max_area = 32 * 32 in
   let tiles =
     Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height)
   in
-  List.iter tiles ~f:(fun tile ->
-      let _bvh_counters = () in
-      render_tile t tile scene t.write_pixel)
+  let pool = Task.setup_pool ~num_domains:7 in
+  let tasks =
+    List.map tiles ~f:(fun tile ->
+        let _bvh_counters = () in
+        Task.async pool (fun () ->
+            let _tile_sampler = () in
+            render_tile t tile scene t.write_pixel))
+  in
+  List.fold tasks ~init:() ~f:(fun () promise -> Task.await pool promise);
+  Task.teardown_pool pool
