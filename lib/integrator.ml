@@ -61,17 +61,18 @@ let trace_ray ray scene max_bounces samples =
   let rec loop ray max_bounces =
     if max_bounces <= 0 then Color.black
     else
+      let max_bounces = max_bounces - 1 in
       match Scene.intersect scene ray with
       | None -> Scene.background scene ray
       | Some h -> (
           let emit = Hit.emit h in
           let u, v = take_2d () in
-          match (Hit.scatter h : Scatter.t) with
+          match (Hit.scatter h u : Scatter.t) with
           | Absorb -> emit
           | Specular (scatter_dir, attenuation) ->
               let scattered_ray = Ray.create (Hit.point h) scatter_dir in
               let open Color.Infix in
-              emit + (attenuation * loop scattered_ray (max_bounces - 1))
+              emit + (attenuation * loop scattered_ray max_bounces)
           | Diffuse attenuation ->
               let open Color.Infix in
               let ss = Hit.shader_space h in
@@ -87,8 +88,8 @@ let trace_ray ray scene max_bounces samples =
                     Ray.create (Hit.point h) (Shader_space.rotate_inv ss dir)
                   in
                   emit
-                  + Color.scale attenuation pd
-                    * loop scattered_ray (max_bounces - 1))
+                  + (Color.scale attenuation pd * loop scattered_ray max_bounces)
+          )
   in
   loop ray max_bounces
 

@@ -77,7 +77,7 @@ module Shirley_spheres = struct
 
   let big_spheres =
     let glass = Material.glass in
-    let metal = Material.metal (solid_tex 1.0 1.0 1.0) in
+    let metal = Material.metal (solid_tex 0.7 0.6 0.5) in
     let blue = solid_lambertian 0.0 0.1 0.4 in
     let radius = 1.0 in
     [
@@ -98,6 +98,15 @@ module Shirley_spheres = struct
     let c = Color.of_v3 V3.Infix.(random_v3 () * random_v3 ()) in
     Material.lambertian (Texture.solid c)
 
+  let random_material () =
+    let open Float.O in
+    let roll = randomf () in
+    if roll < 0.8 then random_lambertian ()
+    else if roll < 0.95 then
+      let z = (0.5 * randomf ()) + 0.5 in
+      Material.metal (solid_tex z z z)
+    else Material.glass
+
   let perturb x = Float.of_int x +. (0.9 *. randomf ())
 
   let small_sphere a b =
@@ -107,7 +116,7 @@ module Shirley_spheres = struct
     let center = p3 x radius z in
     let p = p3 4.0 radius 0.0 in
     if Float.( > ) (V3.quadrance (V3.of_points ~src:center ~tgt:p)) 0.81 then
-      let material = random_lambertian () in
+      let material = random_material () in
       Some (Shape.sphere ~material ~center ~radius)
     else None
 

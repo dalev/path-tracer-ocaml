@@ -25,10 +25,11 @@ let omega_i t =
 
 let point t = t.point
 
-let scatter t =
+let scatter t u =
   let m = Shape.material t.shape in
   let hit_front = t.hit_front in
   Material.scatter m t.shader_space t.tex_coord ~omega_i:(omega_i t) ~hit_front
+    u
 
 let material t = Shape.material t.shape
 

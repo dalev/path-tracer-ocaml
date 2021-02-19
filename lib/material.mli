@@ -12,6 +12,7 @@ val scatter :
   Texture.Coord.t ->
   omega_i:V3.t ->
   hit_front:bool ->
+  float ->
   Scatter.t
 
 val emit : t -> Texture.Coord.t -> Color.t

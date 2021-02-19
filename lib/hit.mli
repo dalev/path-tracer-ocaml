@@ -10,6 +10,6 @@ val omega_i : t -> V3.t
 
 val shader_space : t -> Shader_space.t
 
-val scatter : t -> Scatter.t
+val scatter : t -> float -> Scatter.t
 
 val emit : t -> Color.t

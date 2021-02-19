@@ -31,5 +31,7 @@ let scale t s = map t ~f:(( *. ) s)
 module Infix = struct
   let ( + ) = map2 ~f:( +. )
 
+  let ( - ) = map2 ~f:( -. )
+
   let ( * ) = map2 ~f:( *. )
 end
