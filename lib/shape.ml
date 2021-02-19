@@ -25,10 +25,14 @@ module Geometry = struct
     match t with
     | Sphere { center = _; radius = _ } ->
         let x, y, z = V3.coords normal in
-        let phi = Float.acos (-y) in
-        let theta = Float.pi + Float.atan2 (-z) x in
+        let theta = Float.acos (-y) in
+        let phi = Float.pi + Float.atan2 (-z) x in
         let u = phi / (2.0 * Float.pi) in
         let v = theta / Float.pi in
+        assert (0.0 <= u);
+        assert (u <= 1.);
+        assert (0.0 <= v);
+        assert (v <= 1.);
         Texture.Coord.create u v
 
   let intersect t ray ~t_min ~t_max =

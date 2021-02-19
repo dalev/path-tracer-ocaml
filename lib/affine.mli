@@ -9,6 +9,12 @@ module V3 : sig
 
   val coords : t -> float * float * float
 
+  val x : t -> float
+
+  val y : t -> float
+
+  val z : t -> float
+
   val min_coord : t -> float
 
   val max_coord : t -> float
@@ -16,6 +22,8 @@ module V3 : sig
   val yzx : t -> t
 
   val zero : t
+
+  val one : t
 
   val unit_x : t
 

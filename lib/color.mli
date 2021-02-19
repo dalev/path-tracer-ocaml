@@ -9,6 +9,8 @@ val of_v3 : V3.t -> t
 
 val black : t
 
+val white : t
+
 val scale : t -> float -> t
 
 val map : t -> f:(float -> float) -> t

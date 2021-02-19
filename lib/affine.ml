@@ -11,9 +11,13 @@ module V3 = struct
 
   let coords = Fn.id
 
-  let yzx (x, y, z) = (y, z, x)
+  let x (x, _, _) = x
 
-  let zero = create ~x:0.0 ~y:0.0 ~z:0.0
+  let y (_, y, _) = y
+
+  let z (_, _, z) = z
+
+  let yzx (x, y, z) = (y, z, x)
 
   let unit_x = create ~x:1.0 ~y:1.0 ~z:0.0
 
@@ -34,6 +38,10 @@ module V3 = struct
   end)
 
   include A
+
+  let zero = return 0.0
+
+  let one = return 1.0
 
   module Infix = struct
     let ( + ) = map2 ~f:( +. )

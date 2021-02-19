@@ -63,21 +63,26 @@ let camera aspect =
 module Shirley_spheres = struct
   let p3 x y z = P3.create ~x ~y ~z
 
-  let solid_lambertian r g b =
-    Material.lambertian (Texture.solid (Color.create ~r ~g ~b))
+  let solid_tex r g b = Texture.solid (Color.create ~r ~g ~b)
+
+  let solid_lambertian r g b = Material.lambertian @@ solid_tex r g b
 
   let ground =
-    let gray = solid_lambertian 0.5 0.5 0.5 in
-    Shape.sphere ~material:gray ~center:(p3 0.0 (-1000.0) 0.0) ~radius:1000.0
+    let a = solid_tex 0.2 0.3 0.1 in
+    let b = solid_tex 0.9 0.9 0.9 in
+    let checks =
+      Material.lambertian @@ Texture.checker ~width:1000 ~height:2000 a b
+    in
+    Shape.sphere ~material:checks ~center:(p3 0.0 (-1000.0) 0.0) ~radius:1000.0
 
   let big_spheres =
-    let brown = solid_lambertian 0.4 0.2 0.1 in
-    let green = solid_lambertian 0.0 0.4 0.1 in
+    let glass = Material.glass in
+    let metal = Material.metal (solid_tex 1.0 1.0 1.0) in
     let blue = solid_lambertian 0.0 0.1 0.4 in
     let radius = 1.0 in
     [
-      Shape.sphere ~material:brown ~center:(p3 (-4.0) 1.0 0.0) ~radius;
-      Shape.sphere ~material:green ~center:(p3 0.0 1.0 0.0) ~radius;
+      Shape.sphere ~material:glass ~center:(p3 (-4.0) 1.0 0.0) ~radius;
+      Shape.sphere ~material:metal ~center:(p3 0.0 1.0 0.0) ~radius;
       Shape.sphere ~material:blue ~center:(p3 4.0 1.0 0.0) ~radius;
     ]
 

@@ -68,7 +68,8 @@ let trace_ray ray scene max_bounces samples =
           let u, v = take_2d () in
           match (Hit.scatter h : Scatter.t) with
           | Absorb -> emit
-          | Specular (scattered_ray, attenuation) ->
+          | Specular (scatter_dir, attenuation) ->
+              let scattered_ray = Ray.create (Hit.point h) scatter_dir in
               let open Color.Infix in
               emit + (attenuation * loop scattered_ray (max_bounces - 1))
           | Diffuse attenuation ->

@@ -10,7 +10,9 @@ let create normal origin =
   let rotation =
     if z > 1.0 - epsilon then Quaternion.id
     else if z < epsilon - 1.0 then Quaternion.create 0.0 V3.unit_y
-    else Quaternion.rotation (V3.create ~x:y ~y:(-x) ~z:0.0) (1.0 + z)
+    else
+      Quaternion.normalize
+      @@ Quaternion.create (1.0 + z) (V3.create ~x:y ~y:(-x) ~z:0.0)
   in
   { rotation; origin }
 
@@ -25,6 +27,16 @@ let reflect (_ : t) v =
   let x = ~-.x in
   let y = ~-.y in
   V3.create ~x ~y ~z
+
+let refract (_ : t) wi index =
+  let wi_z = V3.z wi in
+  let c = Float.min wi_z 1.0 in
+  let perp = V3.scale V3.Infix.(V3.create ~x:0.0 ~y:0.0 ~z:c - wi) index in
+  let para =
+    V3.create ~x:0.0 ~y:0.0
+      ~z:(-.Float.sqrt (Float.abs (1.0 -. V3.quadrance perp)))
+  in
+  V3.Infix.(perp + para)
 
 let unit_square_to_hemisphere u v =
   let open Float.O in

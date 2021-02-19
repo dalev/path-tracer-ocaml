@@ -8,4 +8,6 @@ end
 
 val solid : Color.t -> t
 
+val checker : width:int -> height:int -> t -> t -> t
+
 val eval : t -> Coord.t -> Color.t
