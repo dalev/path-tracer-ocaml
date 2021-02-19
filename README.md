@@ -11,4 +11,4 @@ To build, follow the [instructions](https://github.com/ocaml-multicore/multicore
 - bimage-io
 - domainslib
 
-Then generate the sample image by running, e.g.  `dune exec path_tracer -- -max-threads 2 -samples-per-pixel 32`.  Pass the `-help` flag to see other options.  If you say `-max-threads 1`, then the renderer will avoid using the `domainslib` abstractions entirely (rather than spinning up a single `Domain` to do all the work).
+Then generate the sample image by running, e.g.  `dune exec path_tracer -- -max-threads 2 -samples-per-pixel 4`.  Increase `-samples-per-pixel` to render a higher quality image.  (E.g, the image above was rendered with 32 samples per pixel.)  Pass the `-help` flag to see other options.  If you say `-max-threads 1`, then the renderer will avoid using the `domainslib` abstractions entirely (rather than spinning up a single `Domain` to do all the work).
