@@ -1,3 +1,3 @@
 open! Base
 
-let () = failwith "No test suite yet"
+let () = failwith "Oops, nothing to see here"
