@@ -129,7 +129,7 @@ let spawn_progress_ticker update_progress channel num_tiles =
           match Channel.recv channel with
           | Tick ->
               let count' = count + 1 in
-              update_progress (count' // num_tiles);
+              update_progress (count' * 100 // num_tiles);
               loop count'
           | Done -> ()
         in
