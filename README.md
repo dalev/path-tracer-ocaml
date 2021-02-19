@@ -1,5 +1,7 @@
 A simple Monte-Carlo path tracer as described by [Peter Shirley's Ray Tracing](https://raytracing.github.io/) articles.
 
+![a rendering of Shirley's test scene](https://github.com/dalev/path-tracer-ocaml/blob/main/shirley-spheres.png?raw=true)
+
 It's implemented in [Ocaml](https://ocaml.org) using the new experimental [multicore](https://github.com/ocaml-multicore/ocaml-multicore) branch.
 
 To build, follow the [instructions](https://github.com/ocaml-multicore/multicore-opam#install-multicore-ocaml) for installing the experimental compiler.  Then, on that opam switch, `opam install` these libraries:
