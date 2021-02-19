@@ -121,7 +121,7 @@ let render_tile t tile scene write_pixel tile_sampler =
 
 type tick = Tick | Done
 
-let spawn_ticker update_progress channel num_tiles =
+let spawn_progress_ticker update_progress channel num_tiles =
   let module Domain = Caml.Domain in
   let d =
     Domain.spawn (fun () ->
@@ -147,13 +147,12 @@ let create_tile_samplers t tiles =
 
 let render_parallel ?(update_progress = ignore) t scene tiles_and_samplers =
   let num_tiles = List.length tiles_and_samplers in
-  let num_domains = 8 in
+  let num_domains = t.max_threads in
   let pool = Task.setup_pool ~num_domains in
   let channel = Channel.make_bounded num_domains in
-  let join_ticker = spawn_ticker update_progress channel num_tiles in
+  let join_ticker = spawn_progress_ticker update_progress channel num_tiles in
   let tasks =
     List.map tiles_and_samplers ~f:(fun (tile, sampler) ->
-        let _bvh_counters = () in
         Task.async pool (fun () ->
             render_tile t tile scene t.write_pixel sampler;
             Channel.send channel Tick))
@@ -175,6 +174,5 @@ let render ?(update_progress = ignore) t scene =
     render_parallel ~update_progress t scene tiles_and_samplers
   else
     List.iteri tiles_and_samplers ~f:(fun i (tile, sampler) ->
-        let _bvh_counters = () in
         render_tile t tile scene t.write_pixel sampler;
         update_progress ((i + 1) * 100 // num_tiles))
