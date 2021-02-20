@@ -19,11 +19,11 @@ module V3 = struct
 
   let yzx (x, y, z) = (y, z, x)
 
-  let unit_x = create ~x:1.0 ~y:1.0 ~z:0.0
+  let unit_x = create ~x:1.0 ~y:0.0 ~z:0.0
 
   let unit_y = create ~x:0.0 ~y:1.0 ~z:0.0
 
-  let unit_z = create ~x:0.0 ~y:1.0 ~z:1.0
+  let unit_z = create ~x:0.0 ~y:0.0 ~z:1.0
 
   let axis (x, y, z) a = match (a : Axis.t) with X -> x | Y -> y | Z -> z
 
