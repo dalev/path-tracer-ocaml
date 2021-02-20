@@ -10,14 +10,11 @@ module Geometry = struct
     match t with
     | Sphere {center; radius} ->
         let r = V3.of_float radius in
-        Bbox.create
-          ~min:(P3.translate center V3.Infix.(~-r))
-          ~max:(P3.translate center r)
+        Bbox.create ~min:(P3.translate center V3.Infix.(~-r)) ~max:(P3.translate center r)
 
   let normal t pt =
     match t with
-    | Sphere {center; radius= _} ->
-        V3.normalize @@ V3.of_points ~src:center ~tgt:pt
+    | Sphere {center; radius= _} -> V3.normalize @@ V3.of_points ~src:center ~tgt:pt
 
   let tex_coord t _surface_pt normal =
     let open Float.O in
@@ -43,8 +40,7 @@ module Geometry = struct
         let f = V3.of_points ~src:(Ray.origin ray) ~tgt:center in
         let b' = V3.dot f d in
         let a = V3.quadrance d in
-        let discrim =
-          r2 - V3.quadrance (V3.Infix.( - ) (V3.scale d (b' / a)) f) in
+        let discrim = r2 - V3.quadrance (V3.Infix.( - ) (V3.scale d (b' / a)) f) in
         if discrim < 0.0 then None
         else
           let sign_b' = Sign.to_float (Float.sign_exn b') in
@@ -62,10 +58,7 @@ let sphere ~material ~center ~radius =
   {material; geometry= Geometry.Sphere {center; radius}}
 
 let transform t ~f = {t with geometry= Geometry.transform t.geometry ~f}
-
-let intersect t ray ~t_min ~t_max =
-  Geometry.intersect t.geometry ray ~t_min ~t_max
-
+let intersect t ray ~t_min ~t_max = Geometry.intersect t.geometry ray ~t_min ~t_max
 let bbox t = Geometry.bbox t.geometry
 let normal t pt = Geometry.normal t.geometry pt
 let tex_coord t ~surface ~normal = Geometry.tex_coord t.geometry surface normal

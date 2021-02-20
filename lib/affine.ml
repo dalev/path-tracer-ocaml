@@ -44,17 +44,20 @@ module V3 = struct
 
   let of_float x = return x
   let of_points ~src ~tgt = Infix.( - ) tgt src
-  let scale v s = map ~f:(( *. ) s) v
+
+  (* These two inlines are to avoid alloc in Bbox.is_hit *)
   let[@inline] min_coord (x, y, z) = Float.min x (Float.min y z)
   let[@inline] max_coord (x, y, z) = Float.max x (Float.max y z)
-  let lerp t v w = Infix.( + ) (scale v (1.0 -. t)) (scale w t)
 
-  let dot v w =
+  (* This inline is to reduce alloc in sphere intersect *)
+  let[@inline] dot v w =
     let open Infix in
     let a, b, c = v * w in
     a +. b +. c
 
-  let quadrance v = dot v v
+  let[@inline] scale v s = map ~f:(( *. ) s) v
+  let[@inline] quadrance v = dot v v
+  let lerp t v w = Infix.( + ) (scale v (1.0 -. t)) (scale w t)
 
   let normalize v =
     let scalar = 1.0 /. Float.sqrt (quadrance v) in
