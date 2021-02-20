@@ -28,8 +28,7 @@ module Tile = struct
     let rhs = {t with row= t.row + half_h; height= t.height - half_h} in
     (lhs, rhs)
 
-  let split_once t =
-    if t.width > t.height then split_width t else split_height t
+  let split_once t = if t.width > t.height then split_width t else split_height t
 
   let split t ~max_area =
     let rec loop t =
@@ -44,10 +43,11 @@ end
 
 let trace_ray ray scene max_bounces samples =
   let take_2d =
+    let module L = Low_discrepancy in
     let samples_index = ref 2 in
     fun () ->
       let j = !samples_index in
-      let u = samples.(j) and v = samples.(j + 1) in
+      let u = L.Sample.get samples j and v = L.Sample.get samples (j + 1) in
       samples_index := j + 2 ;
       (u, v) in
   let diffuse_plus_light = Scene.diffuse_plus_light_pdf scene in
@@ -78,11 +78,9 @@ let trace_ray ray scene max_bounces samples =
                 if not (Float.is_finite pd) then emit
                 else
                   let scattered_ray =
-                    Ray.create (Hit.point h) (Shader_space.rotate_inv ss dir)
-                  in
-                  emit
-                  + (Color.scale attenuation pd * loop scattered_ray max_bounces)
-          ) in
+                    Ray.create (Hit.point h) (Shader_space.rotate_inv ss dir) in
+                  emit + (Color.scale attenuation pd * loop scattered_ray max_bounces) )
+  in
   loop ray max_bounces
 
 let gamma = Color.map ~f:Float.sqrt
@@ -100,7 +98,7 @@ let render_tile t tile scene write_pixel tile_sampler =
       let color = ref Color.black in
       for _ = 1 to t.samples_per_pixel do
         let s = Low_discrepancy.step tile_sampler in
-        let dx = s.(0) and dy = s.(1) in
+        let dx = Low_discrepancy.Sample.get s 0 and dy = Low_discrepancy.Sample.get s 1 in
         let cx = (xf +. dx) *. widthf in
         let cy = (yf +. dy) *. heightf in
         let ray = Scene.camera_ray scene cx cy in
@@ -121,8 +119,7 @@ let create_tile_samplers t tiles =
 
 let render ?(update_progress = ignore) t scene =
   let max_area = 32 * 32 in
-  let tiles =
-    Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height) in
+  let tiles = Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height) in
   let num_tiles = List.length tiles in
   let tiles_and_samplers = create_tile_samplers t tiles in
   printf "#tiles = %d\n" num_tiles ;
