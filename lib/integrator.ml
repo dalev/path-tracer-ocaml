@@ -7,12 +7,10 @@ type t = {
   write_pixel : x:int -> y:int -> r:float -> g:float -> b:float -> unit;
   samples_per_pixel : int;
   max_bounces : int;
-  max_threads : int;
 }
 
-let create ~width ~height ~write_pixel ~samples_per_pixel ~max_bounces
-    ~max_threads =
-  { width; height; write_pixel; samples_per_pixel; max_bounces; max_threads }
+let create ~width ~height ~write_pixel ~samples_per_pixel ~max_bounces =
+  { width; height; write_pixel; samples_per_pixel; max_bounces }
 
 module Tile = struct
   type t = { row : int; col : int; width : int; height : int }
