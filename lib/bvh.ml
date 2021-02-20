@@ -2,16 +2,6 @@ open Base
 
 type t = Leaf of Shape.t | Branch of Bbox.t * t * t
 
-(*
-module Slice = struct
-  include Array
-
-  let create = Fn.id
-
-  let partition_in_place t p to_bin = partition_tf t ~f:(fun e -> to_bin e <= p)
-end
-*)
-
 module Bshape = struct
   type t = {shape: Shape.t; bbox: Bbox.t; centroid: P3.t}
 
@@ -33,16 +23,13 @@ module Bin = struct
   let bbox t = t.bounds
 
   let scaled_area t =
-    Option.map t.bounds ~f:(fun bbox ->
-        Float.of_int t.count *. Bbox.surface_area bbox )
+    Option.map t.bounds ~f:(fun bbox -> Float.of_int t.count *. Bbox.surface_area bbox)
 
   let insert t b =
     let b_box = Bshape.bbox b in
     let bounds =
-      Some
-        ( match t.bounds with
-        | None -> b_box
-        | Some t_box -> Bbox.union t_box b_box ) in
+      Some (match t.bounds with None -> b_box | Some t_box -> Bbox.union t_box b_box)
+    in
     {count= t.count + 1; bounds}
 
   let join_bounds t t' =
@@ -92,19 +79,14 @@ let create shapes =
           let epsilon = 1e-6 in
           let cb_min = to_axis (Bbox.min cbox) in
           let cb_max = to_axis (Bbox.max cbox) in
-          let scale =
-            Float.of_int num_bins *. (1.0 -. epsilon) /. (cb_max -. cb_min)
-          in
-          fun b ->
-            Float.to_int (scale *. (to_axis (Bshape.centroid b) -. cb_min))
-        in
+          let scale = Float.of_int num_bins *. (1.0 -. epsilon) /. (cb_max -. cb_min) in
+          fun b -> Float.to_int (scale *. (to_axis (Bshape.centroid b) -. cb_min)) in
         Slice.iter shapes ~f:(fun s ->
             let j = to_bin s in
             let bin = bins.(j) in
             bins.(j) <- Bin.insert bin s ) ;
         let total_bbox =
-          Array.filter_map bins ~f:Bin.bbox |> Array.reduce_exn ~f:Bbox.union
-        in
+          Array.filter_map bins ~f:Bin.bbox |> Array.reduce_exn ~f:Bbox.union in
         let best_partition =
           let total_area = Bbox.surface_area total_bbox in
           List.init (num_bins - 1) ~f:(fun p ->
@@ -114,21 +96,18 @@ let create shapes =
               | None, _ | _, None -> None
               | Some lhs_area, Some rhs_area ->
                   let open Float.O in
-                  let cost =
-                    costT + ((lhs_area + rhs_area) * costI / total_area) in
+                  let cost = costT + ((lhs_area + rhs_area) * costI / total_area) in
                   Some (p, cost) )
           |> List.filter_opt
-          |> List.min_elt ~compare:(fun (_, cost) (_, cost') ->
-                 Float.compare cost cost' ) in
+          |> List.min_elt ~compare:(fun (_, cost) (_, cost') -> Float.compare cost cost')
+        in
         match best_partition with
         | None ->
-            Printf.failwithf
-              "to do: Bvh build: all shapes assigned to same bin: len = %d"
+            Printf.failwithf "to do: Bvh build: all shapes assigned to same bin: len = %d"
               (Slice.length shapes) ()
         | Some (p, split_cost) ->
             let leaf_cost = leaf_cost (Slice.length shapes) in
-            if Float.( < ) leaf_cost split_cost then
-              failwith "to do: Bvh multi-leaf"
+            if Float.( < ) leaf_cost split_cost then failwith "to do: Bvh multi-leaf"
             else
               let lhs, rhs = Slice.partition_in_place shapes p to_bin in
               Branch (total_bbox, loop lhs, loop rhs) ) in
@@ -152,9 +131,7 @@ let intersect t ray ~t_min ~t_max =
           match loop lhs t_max with
           | None -> loop rhs t_max
           | Some (t_hit, _) as some_lhs -> (
-            match loop rhs t_hit with
-            | None -> some_lhs
-            | Some _ as some_rhs -> some_rhs )
+            match loop rhs t_hit with None -> some_lhs | Some _ as some_rhs -> some_rhs )
         else None in
   match loop t t_max with
   | None -> None
