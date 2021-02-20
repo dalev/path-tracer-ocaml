@@ -21,8 +21,8 @@ module Args = struct
     let no_progress = ref false in
     let max_bounces = ref 4 in
     let usage_msg =
-      Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width
-        !height !file in
+      Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width !height !file
+    in
     Caml.Arg.parse
       [ ("-width", Set_int width, "<integer> image width")
       ; ("-height", Set_int height, "<integer> image height")
@@ -57,8 +57,7 @@ module Shirley_spheres = struct
   let ground =
     let a = solid_tex 0.2 0.3 0.1 in
     let b = solid_tex 0.9 0.9 0.9 in
-    let checks =
-      Material.lambertian @@ Texture.checker ~width:1000 ~height:2000 a b in
+    let checks = Material.lambertian @@ Texture.checker ~width:1000 ~height:2000 a b in
     Shape.sphere ~material:checks ~center:(p3 0.0 (-1000.0) 0.0) ~radius:1000.0
 
   let big_spheres =
@@ -123,19 +122,17 @@ let main args =
   let img = mkImage width height in
   let write_pixel ~x ~y ~r ~g ~b =
     let px = Pixel.empty Bimage.rgb in
-    Pixel.set px 0 r ;
-    Pixel.set px 1 g ;
-    Pixel.set px 2 b ;
-    Image.set_pixel img x y px in
+    Pixel.set px 0 r ; Pixel.set px 1 g ; Pixel.set px 2 b ; Image.set_pixel img x y px
+  in
   let i =
-    Integrator.create ~width ~height ~write_pixel ~max_bounces
-      ~samples_per_pixel:spp in
+    Integrator.create ~width ~height ~write_pixel ~max_bounces ~samples_per_pixel:spp
+  in
   let spheres = Random.init 42 ; Shirley_spheres.spheres () in
   printf "dim = %d x %d;\n" width height ;
   printf "#spheres = %d\n" (List.length spheres) ;
   let update_progress =
-    if no_progress then None
-    else Some (fun pct -> printf "\rProgress: %3.1f%%%!" pct) in
+    if no_progress then None else Some (fun pct -> printf "\rProgress: %3.1f%%%!" pct)
+  in
   Integrator.render ?update_progress i
     (Scene.create (camera (width // height)) spheres ~background) ;
   printf "\n" ;

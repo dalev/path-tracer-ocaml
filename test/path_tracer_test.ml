@@ -23,5 +23,4 @@ let () =
         ; Alcotest.test_case "ray away" `Quick (fun () ->
               Alcotest.(check bool)
                 "..." false
-                (Bbox.is_hit unit_bbox ray_miss ~t_min:0.0 ~t_max:1000.0) ) ] )
-    ]
+                (Bbox.is_hit unit_bbox ray_miss ~t_min:0.0 ~t_max:1000.0) ) ] ) ]

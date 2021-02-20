@@ -14,14 +14,12 @@ let t_min = 0.0
 let t_max = 10.0
 
 let is_hit ray =
-  Bbox.is_hit
-    (Sys.opaque_identity unit_bbox)
-    (Sys.opaque_identity ray) ~t_min ~t_max
+  Bbox.is_hit (Sys.opaque_identity unit_bbox) (Sys.opaque_identity ray) ~t_min ~t_max
 
 let () =
   Core.Command.run
     (Bench.make_command
        [ Bench.Test.create_group ~name:"bbox"
            [ Bench.Test.create ~name:"hit" (fun () -> assert (is_hit ray_hit))
-           ; Bench.Test.create ~name:"miss" (fun () ->
-                 assert (not (is_hit ray_miss)) ) ] ] )
+           ; Bench.Test.create ~name:"miss" (fun () -> assert (not (is_hit ray_miss))) ]
+       ] )
