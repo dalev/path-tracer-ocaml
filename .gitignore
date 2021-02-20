@@ -1,4 +1,6 @@
 *.png
+perf.data
+perf.data.old
 
 *.annot
 *.cmo
