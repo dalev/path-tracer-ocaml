@@ -1,6 +1,6 @@
 open Base
 
-type t = { rotation : Quaternion.t; origin : P3.t }
+type t = {rotation: Quaternion.t; origin: P3.t}
 
 let epsilon = 1e-9
 
@@ -12,9 +12,8 @@ let create normal origin =
     else if z < epsilon - 1.0 then Quaternion.create 0.0 V3.unit_y
     else
       Quaternion.normalize
-      @@ Quaternion.create (1.0 + z) (V3.create ~x:y ~y:(-x) ~z:0.0)
-  in
-  { rotation; origin }
+      @@ Quaternion.create (1.0 + z) (V3.create ~x:y ~y:(-x) ~z:0.0) in
+  {rotation; origin}
 
 let rotate t v = Quaternion.transform t.rotation v
 
@@ -34,8 +33,7 @@ let refract (_ : t) wi index =
   let perp = V3.scale V3.Infix.(V3.create ~x:0.0 ~y:0.0 ~z:c - wi) index in
   let para =
     V3.create ~x:0.0 ~y:0.0
-      ~z:(-.Float.sqrt (Float.abs (1.0 -. V3.quadrance perp)))
-  in
+      ~z:(-.Float.sqrt (Float.abs (1.0 -. V3.quadrance perp))) in
   V3.Infix.(perp + para)
 
 let unit_square_to_hemisphere u v =

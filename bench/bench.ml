@@ -11,7 +11,6 @@ let ray_hit, ray_miss =
   (Ray.create o hit, Ray.create o miss)
 
 let t_min = 0.0
-
 let t_max = 10.0
 
 let is_hit ray =
@@ -22,8 +21,7 @@ let is_hit ray =
 let () =
   Core.Command.run
     (Bench.make_command
-       [
-         Bench.Test.create ~name:"bbox hit" (fun () -> assert (is_hit ray_hit));
-         Bench.Test.create ~name:"bbox miss" (fun () ->
-             assert (not (is_hit ray_miss)));
-       ])
+       [ Bench.Test.create_group ~name:"bbox"
+           [ Bench.Test.create ~name:"hit" (fun () -> assert (is_hit ray_hit))
+           ; Bench.Test.create ~name:"miss" (fun () ->
+                 assert (not (is_hit ray_miss)) ) ] ] )

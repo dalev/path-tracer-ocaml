@@ -1,32 +1,31 @@
 open! Base
 open! Stdio
 
-type t = {
-  width : int;
-  height : int;
-  write_pixel : x:int -> y:int -> r:float -> g:float -> b:float -> unit;
-  samples_per_pixel : int;
-  max_bounces : int;
-}
+type t =
+  { width: int
+  ; height: int
+  ; write_pixel: x:int -> y:int -> r:float -> g:float -> b:float -> unit
+  ; samples_per_pixel: int
+  ; max_bounces: int }
 
 let create ~width ~height ~write_pixel ~samples_per_pixel ~max_bounces =
-  { width; height; write_pixel; samples_per_pixel; max_bounces }
+  {width; height; write_pixel; samples_per_pixel; max_bounces}
 
 module Tile = struct
-  type t = { row : int; col : int; width : int; height : int }
+  type t = {row: int; col: int; width: int; height: int}
 
   let area t = t.width * t.height
 
   let split_width t =
     let half_w = t.width / 2 in
-    let lhs = { t with width = half_w } in
-    let rhs = { t with col = t.col + half_w; width = t.width - half_w } in
+    let lhs = {t with width= half_w} in
+    let rhs = {t with col= t.col + half_w; width= t.width - half_w} in
     (lhs, rhs)
 
   let split_height t =
     let half_h = t.height / 2 in
-    let lhs = { t with height = half_h } in
-    let rhs = { t with row = t.row + half_h; height = t.height - half_h } in
+    let lhs = {t with height= half_h} in
+    let rhs = {t with row= t.row + half_h; height= t.height - half_h} in
     (lhs, rhs)
 
   let split_once t =
@@ -34,14 +33,13 @@ module Tile = struct
 
   let split t ~max_area =
     let rec loop t =
-      if area t <= max_area then [ t ]
+      if area t <= max_area then [t]
       else
         let lhs, rhs = split_once t in
-        loop lhs @ loop rhs
-    in
+        loop lhs @ loop rhs in
     loop t
 
-  let create ~width ~height = { row = 0; col = 0; width; height }
+  let create ~width ~height = {row= 0; col= 0; width; height}
 end
 
 let trace_ray ray scene max_bounces samples =
@@ -50,9 +48,8 @@ let trace_ray ray scene max_bounces samples =
     fun () ->
       let j = !samples_index in
       let u = samples.(j) and v = samples.(j + 1) in
-      samples_index := j + 2;
-      (u, v)
-  in
+      samples_index := j + 2 ;
+      (u, v) in
   let diffuse_plus_light = Scene.diffuse_plus_light_pdf scene in
   let rec loop ray max_bounces =
     if max_bounces <= 0 then Color.black
@@ -85,8 +82,7 @@ let trace_ray ray scene max_bounces samples =
                   in
                   emit
                   + (Color.scale attenuation pd * loop scattered_ray max_bounces)
-          )
-  in
+          ) in
   loop ray max_bounces
 
 let gamma = Color.map ~f:Float.sqrt
@@ -109,7 +105,7 @@ let render_tile t tile scene write_pixel tile_sampler =
         let cy = (yf +. dy) *. heightf in
         let ray = Scene.camera_ray scene cx cy in
         color := Color.Infix.( + ) !color @@ trace_ray ray scene t.max_bounces s
-      done;
+      done ;
       let r, g, b = Color.rgb @@ gamma (Color.scale !color spp_invf) in
       write_pixel ~x ~y ~r ~g ~b
     done
@@ -120,17 +116,16 @@ let create_tile_samplers t tiles =
   List.map tiles ~f:(fun tile ->
       let n = t.samples_per_pixel * Tile.area tile in
       let tile_sampler, suffix = Low_discrepancy.split_at !s n in
-      s := suffix;
-      (tile, tile_sampler))
+      s := suffix ;
+      (tile, tile_sampler) )
 
 let render ?(update_progress = ignore) t scene =
   let max_area = 32 * 32 in
   let tiles =
-    Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height)
-  in
+    Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height) in
   let num_tiles = List.length tiles in
   let tiles_and_samplers = create_tile_samplers t tiles in
-  printf "#tiles = %d\n" num_tiles;
+  printf "#tiles = %d\n" num_tiles ;
   List.iteri tiles_and_samplers ~f:(fun i (tile, sampler) ->
-      render_tile t tile scene t.write_pixel sampler;
-      update_progress ((i + 1) * 100 // num_tiles))
+      render_tile t tile scene t.write_pixel sampler ;
+      update_progress ((i + 1) * 100 // num_tiles) )

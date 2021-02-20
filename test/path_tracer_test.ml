@@ -11,20 +11,17 @@ let ray_hit, ray_miss =
 
 let () =
   Alcotest.run "intersection"
-    [
-      ( "Bbox.is_hit",
-        [
-          Alcotest.test_case "ray towards / t_max > 5" `Quick (fun () ->
+    [ ( "Bbox.is_hit"
+      , [ Alcotest.test_case "ray towards / t_max > 5" `Quick (fun () ->
               Alcotest.(check bool)
                 "..." true
-                (Bbox.is_hit unit_bbox ray_hit ~t_min:0.0 ~t_max:5.01));
-          Alcotest.test_case "ray towards / t_max < 5" `Quick (fun () ->
+                (Bbox.is_hit unit_bbox ray_hit ~t_min:0.0 ~t_max:5.01) )
+        ; Alcotest.test_case "ray towards / t_max < 5" `Quick (fun () ->
               Alcotest.(check bool)
                 "..." false
-                (Bbox.is_hit unit_bbox ray_hit ~t_min:0.0 ~t_max:4.99));
-          Alcotest.test_case "ray away" `Quick (fun () ->
+                (Bbox.is_hit unit_bbox ray_hit ~t_min:0.0 ~t_max:4.99) )
+        ; Alcotest.test_case "ray away" `Quick (fun () ->
               Alcotest.(check bool)
                 "..." false
-                (Bbox.is_hit unit_bbox ray_miss ~t_min:0.0 ~t_max:1000.0));
-        ] );
+                (Bbox.is_hit unit_bbox ray_miss ~t_min:0.0 ~t_max:1000.0) ) ] )
     ]

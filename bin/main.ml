@@ -5,14 +5,13 @@ module Image = Bimage.Image
 module Pixel = Bimage.Pixel
 
 module Args = struct
-  type t = {
-    width : int;
-    height : int;
-    spp : int;
-    output : string;
-    no_progress : bool;
-    max_bounces : int;
-  }
+  type t =
+    { width: int
+    ; height: int
+    ; spp: int
+    ; output: string
+    ; no_progress: bool
+    ; max_bounces: int }
 
   let parse () =
     let width = ref 600 in
@@ -23,31 +22,25 @@ module Args = struct
     let max_bounces = ref 4 in
     let usage_msg =
       Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width
-        !height !file
-    in
+        !height !file in
     Caml.Arg.parse
-      [
-        ("-width", Set_int width, "<integer> image width");
-        ("-height", Set_int height, "<integer> image height");
-        ("-samples-per-pixel", Set_int spp, "<integer> samples-per-pixel");
-        ("-o", Set_string file, "<file> output file");
-        ("-no-progress", Set no_progress, "suppress progress monitor");
-        ("-max-bounces", Set_int max_bounces, "<integer> max ray bounces");
-      ]
+      [ ("-width", Set_int width, "<integer> image width")
+      ; ("-height", Set_int height, "<integer> image height")
+      ; ("-samples-per-pixel", Set_int spp, "<integer> samples-per-pixel")
+      ; ("-o", Set_string file, "<file> output file")
+      ; ("-no-progress", Set no_progress, "suppress progress monitor")
+      ; ("-max-bounces", Set_int max_bounces, "<integer> max ray bounces") ]
       (fun (_ : string) -> failwith "No anonymous arguments expected")
-      usage_msg;
-    {
-      width = !width;
-      height = !height;
-      spp = !spp;
-      output = !file;
-      no_progress = !no_progress;
-      max_bounces = !max_bounces;
-    }
+      usage_msg ;
+    { width= !width
+    ; height= !height
+    ; spp= !spp
+    ; output= !file
+    ; no_progress= !no_progress
+    ; max_bounces= !max_bounces }
 end
 
 let color_space = Bimage.rgb
-
 let mkImage width height = Image.v Bimage.f64 color_space width height
 
 let camera aspect =
@@ -58,17 +51,14 @@ let camera aspect =
 
 module Shirley_spheres = struct
   let p3 x y z = P3.create ~x ~y ~z
-
   let solid_tex r g b = Texture.solid (Color.create ~r ~g ~b)
-
   let solid_lambertian r g b = Material.lambertian @@ solid_tex r g b
 
   let ground =
     let a = solid_tex 0.2 0.3 0.1 in
     let b = solid_tex 0.9 0.9 0.9 in
     let checks =
-      Material.lambertian @@ Texture.checker ~width:1000 ~height:2000 a b
-    in
+      Material.lambertian @@ Texture.checker ~width:1000 ~height:2000 a b in
     Shape.sphere ~material:checks ~center:(p3 0.0 (-1000.0) 0.0) ~radius:1000.0
 
   let big_spheres =
@@ -76,11 +66,9 @@ module Shirley_spheres = struct
     let metal = Material.metal (solid_tex 0.7 0.6 0.5) in
     let blue = solid_lambertian 0.0 0.1 0.4 in
     let radius = 1.0 in
-    [
-      Shape.sphere ~material:glass ~center:(p3 (-4.0) 1.0 0.0) ~radius;
-      Shape.sphere ~material:metal ~center:(p3 0.0 1.0 0.0) ~radius;
-      Shape.sphere ~material:blue ~center:(p3 4.0 1.0 0.0) ~radius;
-    ]
+    [ Shape.sphere ~material:glass ~center:(p3 (-4.0) 1.0 0.0) ~radius
+    ; Shape.sphere ~material:metal ~center:(p3 0.0 1.0 0.0) ~radius
+    ; Shape.sphere ~material:blue ~center:(p3 4.0 1.0 0.0) ~radius ]
 
   let randomf () = Random.float 1.0
 
@@ -120,7 +108,7 @@ module Shirley_spheres = struct
     let rng = List.range (-11) 11 ~start:`inclusive ~stop:`inclusive in
     ground :: big_spheres
     @ List.concat_map rng ~f:(fun a ->
-          List.filter_map rng ~f:(fun b -> small_sphere a b))
+          List.filter_map rng ~f:(fun b -> small_sphere a b) )
 end
 
 let background ray =
@@ -131,36 +119,30 @@ let background ray =
   Color.of_v3 (V3.lerp t one escape_color)
 
 let main args =
-  let { Args.width; height; spp; output; no_progress; max_bounces } = args in
+  let {Args.width; height; spp; output; no_progress; max_bounces} = args in
   let img = mkImage width height in
   let write_pixel ~x ~y ~r ~g ~b =
     let px = Pixel.empty Bimage.rgb in
-    Pixel.set px 0 r;
-    Pixel.set px 1 g;
-    Pixel.set px 2 b;
-    Image.set_pixel img x y px
-  in
+    Pixel.set px 0 r ;
+    Pixel.set px 1 g ;
+    Pixel.set px 2 b ;
+    Image.set_pixel img x y px in
   let i =
     Integrator.create ~width ~height ~write_pixel ~max_bounces
-      ~samples_per_pixel:spp
-  in
-  let spheres =
-    Random.init 42;
-    Shirley_spheres.spheres ()
-  in
-  printf "dim = %d x %d;\n" width height;
-  printf "#spheres = %d\n" (List.length spheres);
+      ~samples_per_pixel:spp in
+  let spheres = Random.init 42 ; Shirley_spheres.spheres () in
+  printf "dim = %d x %d;\n" width height ;
+  printf "#spheres = %d\n" (List.length spheres) ;
   let update_progress =
     if no_progress then None
-    else Some (fun pct -> printf "\rProgress: %3.1f%%%!" pct)
-  in
+    else Some (fun pct -> printf "\rProgress: %3.1f%%%!" pct) in
   Integrator.render ?update_progress i
-    (Scene.create (camera (width // height)) spheres ~background);
-  printf "\n";
-  (match Bimage_io.write output img with
+    (Scene.create (camera (width // height)) spheres ~background) ;
+  printf "\n" ;
+  ( match Bimage_io.write output img with
   | Ok () -> ()
   | Error (`File_not_found f) -> printf "File not found: %s" f
-  | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other));
+  | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other) ) ;
   printf "Done\n"
 
 let () = main (Args.parse ())
