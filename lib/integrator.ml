@@ -1,7 +1,5 @@
 open! Base
 open! Stdio
-module Task = Domainslib.Task
-module Channel = Domainslib.Chan
 
 type t = {
   width : int;
@@ -119,24 +117,6 @@ let render_tile t tile scene write_pixel tile_sampler =
     done
   done
 
-type tick = Tick | Done
-
-let spawn_progress_ticker update_progress channel num_tiles =
-  let module Domain = Caml.Domain in
-  let d =
-    Domain.spawn (fun () ->
-        let rec loop count =
-          match Channel.recv channel with
-          | Tick ->
-              let count' = count + 1 in
-              update_progress (count' * 100 // num_tiles);
-              loop count'
-          | Done -> ()
-        in
-        loop 0)
-  in
-  fun () -> Domain.join d
-
 let create_tile_samplers t tiles =
   let s = ref (Low_discrepancy.create (2 + (2 * (t.max_bounces + 1)))) in
   List.map tiles ~f:(fun tile ->
@@ -144,23 +124,6 @@ let create_tile_samplers t tiles =
       let tile_sampler, suffix = Low_discrepancy.split_at !s n in
       s := suffix;
       (tile, tile_sampler))
-
-let render_parallel ?(update_progress = ignore) t scene tiles_and_samplers =
-  let num_tiles = List.length tiles_and_samplers in
-  let num_domains = t.max_threads in
-  let pool = Task.setup_pool ~num_domains in
-  let channel = Channel.make_bounded num_domains in
-  let join_ticker = spawn_progress_ticker update_progress channel num_tiles in
-  let tasks =
-    List.map tiles_and_samplers ~f:(fun (tile, sampler) ->
-        Task.async pool (fun () ->
-            render_tile t tile scene t.write_pixel sampler;
-            Channel.send channel Tick))
-  in
-  List.fold tasks ~init:() ~f:(fun () promise -> Task.await pool promise);
-  Channel.send channel Done;
-  join_ticker ();
-  Task.teardown_pool pool
 
 let render ?(update_progress = ignore) t scene =
   let max_area = 32 * 32 in
@@ -170,9 +133,6 @@ let render ?(update_progress = ignore) t scene =
   let num_tiles = List.length tiles in
   let tiles_and_samplers = create_tile_samplers t tiles in
   printf "#tiles = %d\n" num_tiles;
-  if t.max_threads > 1 then
-    render_parallel ~update_progress t scene tiles_and_samplers
-  else
-    List.iteri tiles_and_samplers ~f:(fun i (tile, sampler) ->
-        render_tile t tile scene t.write_pixel sampler;
-        update_progress ((i + 1) * 100 // num_tiles))
+  List.iteri tiles_and_samplers ~f:(fun i (tile, sampler) ->
+      render_tile t tile scene t.write_pixel sampler;
+      update_progress ((i + 1) * 100 // num_tiles))
