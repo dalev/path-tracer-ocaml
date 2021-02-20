@@ -1,3 +1,4 @@
+module Bbox = Bbox
 module Camera = Camera
 module Color = Color
 module Integrator = Integrator

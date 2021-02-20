@@ -1,0 +1,4 @@
+(executable
+ (name bench)
+ (ocamlopt_flags :standard)
+ (libraries path_tracer core_bench))

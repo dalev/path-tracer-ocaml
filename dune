@@ -1,4 +1,6 @@
 (env
  (release
   (ocamlopt_flags
-   (:standard -O2))))
+   (:standard
+    ;-dump-into-file -dcmm 
+    -O2))))

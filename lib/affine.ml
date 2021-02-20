@@ -4,8 +4,14 @@ type 'a poly = 'a * 'a * 'a
 
 type p3 = float poly
 
+let to_string (x, y, z) = Printf.sprintf "(%f, %f, %f)" x y z
+
+let pp f t = Caml.Format.pp_print_string f (to_string t)
+
 module V3 = struct
   type t = float poly
+
+  let pp = pp
 
   let create ~x ~y ~z = (x, y, z)
 
@@ -19,11 +25,11 @@ module V3 = struct
 
   let yzx (x, y, z) = (y, z, x)
 
-  let unit_x = create ~x:1.0 ~y:1.0 ~z:0.0
+  let unit_x = create ~x:1.0 ~y:0.0 ~z:0.0
 
   let unit_y = create ~x:0.0 ~y:1.0 ~z:0.0
 
-  let unit_z = create ~x:0.0 ~y:1.0 ~z:1.0
+  let unit_z = create ~x:0.0 ~y:0.0 ~z:1.0
 
   let axis (x, y, z) a = match (a : Axis.t) with X -> x | Y -> y | Z -> z
 
@@ -61,9 +67,9 @@ module V3 = struct
 
   let scale v s = map ~f:(( *. ) s) v
 
-  let min_coord (x, y, z) = Float.min x (Float.min y z)
+  let[@inline] min_coord (x, y, z) = Float.min x (Float.min y z)
 
-  let max_coord (x, y, z) = Float.max x (Float.max y z)
+  let[@inline] max_coord (x, y, z) = Float.max x (Float.max y z)
 
   let lerp t v w = Infix.( + ) (scale v (1.0 -. t)) (scale w t)
 
