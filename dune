@@ -3,5 +3,6 @@
   (ocamlopt_flags
    (:standard
     -O2
-    ;-dump-into-file -dcmm 
+    -nodynlink
+    ;-dump-into-file -dcmm
     ))))
