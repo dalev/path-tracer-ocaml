@@ -8,7 +8,6 @@ let of_v3 v =
   let r, g, b = V3.coords v in
   {r; g; b}
 
-let rgb c = (c.r, c.g, c.b)
 let black = {r= 0.0; g= 0.0; b= 0.0}
 let white = {r= 1.0; g= 1.0; b= 1.0}
 
@@ -24,10 +23,13 @@ let map2 c c' ~f =
   let b = f c.b c'.b in
   {r; g; b}
 
-let scale t s = map t ~f:(( *. ) s)
+let[@inline] scale t s = map t ~f:(( *. ) s)
 
 module Infix = struct
   let ( + ) = map2 ~f:( +. )
+
   let ( - ) = map2 ~f:( -. )
+
   let ( * ) = map2 ~f:( *. )
 end
+[@ocamlformat "module-item-spacing=sparse"]

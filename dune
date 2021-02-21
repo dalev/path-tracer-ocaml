@@ -2,7 +2,5 @@
  (release
   (ocamlopt_flags
    (:standard
-    -O2
-    -nodynlink
-    ;-dump-into-file -dcmm
-    ))))
+    ; -dump-into-file -dcmm
+    -O2))))

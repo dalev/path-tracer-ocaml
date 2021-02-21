@@ -120,7 +120,7 @@ let background ray =
 let main args =
   let {Args.width; height; spp; output; no_progress; max_bounces} = args in
   let img = mkImage width height in
-  let write_pixel ~x ~y ~r ~g ~b =
+  let write_pixel ~x ~y {Color.r; g; b} =
     let px = Pixel.empty Bimage.rgb in
     Pixel.set px 0 r ; Pixel.set px 1 g ; Pixel.set px 2 b ; Image.set_pixel img x y px
   in

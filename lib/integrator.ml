@@ -4,7 +4,7 @@ open! Stdio
 type t =
   { width: int
   ; height: int
-  ; write_pixel: x:int -> y:int -> r:float -> g:float -> b:float -> unit
+  ; write_pixel: x:int -> y:int -> Color.t -> unit
   ; samples_per_pixel: int
   ; max_bounces: int }
 
@@ -104,8 +104,7 @@ let render_tile t tile scene write_pixel tile_sampler =
         let ray = Scene.camera_ray scene cx cy in
         color := Color.Infix.( + ) !color @@ trace_ray ray scene t.max_bounces s
       done ;
-      let r, g, b = Color.rgb @@ gamma (Color.scale !color spp_invf) in
-      write_pixel ~x ~y ~r ~g ~b
+      write_pixel ~x ~y @@ gamma (Color.scale !color spp_invf)
     done
   done
 
