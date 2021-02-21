@@ -2,5 +2,6 @@
  (release
   (ocamlopt_flags
    (:standard
+    -O2
     ;-dump-into-file -dcmm 
-    -O2))))
+    ))))
