@@ -120,19 +120,18 @@ let create shapes =
       loop (Slice.create a)
 
 let intersect t ray ~t_min ~t_max =
-  let rec loop t t_max =
+  let rec loop t ray ~t_min ~t_max accum =
     match t with
     | Leaf s -> (
       match Shape.intersect s ray ~t_min ~t_max with
-      | None -> None
+      | None -> accum
       | Some t_hit -> Some (t_hit, s) )
     | Branch (bbox, lhs, rhs) ->
         if Bbox.is_hit bbox ray ~t_min ~t_max then
-          match loop lhs t_max with
-          | None -> loop rhs t_max
-          | Some (t_hit, _) as some_lhs -> (
-            match loop rhs t_hit with None -> some_lhs | Some _ as some_rhs -> some_rhs )
+          let lhs_ans = loop lhs ray ~t_min ~t_max accum in
+          let t_max = match lhs_ans with None -> t_max | Some (t_hit, _) -> t_hit in
+          loop rhs ray ~t_min ~t_max lhs_ans
         else None in
-  match loop t t_max with
+  match loop t ray ~t_min ~t_max None with
   | None -> None
   | Some (t_hit, shape) -> Some (Hit.create ~t_hit shape ray)
