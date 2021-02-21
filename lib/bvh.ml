@@ -131,7 +131,7 @@ let intersect t ray ~t_min ~t_max =
           let lhs_ans = loop lhs ray ~t_min ~t_max accum in
           let t_max = match lhs_ans with None -> t_max | Some (t_hit, _) -> t_hit in
           loop rhs ray ~t_min ~t_max lhs_ans
-        else None in
+        else accum in
   match loop t ray ~t_min ~t_max None with
   | None -> None
   | Some (t_hit, shape) -> Some (Hit.create ~t_hit shape ray)
