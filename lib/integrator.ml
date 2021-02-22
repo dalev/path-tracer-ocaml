@@ -1,5 +1,6 @@
 open! Base
 open! Stdio
+module L = Low_discrepancy_sequence
 
 type t =
   { width: int
@@ -43,7 +44,6 @@ end
 
 let trace_ray ray scene max_bounces samples =
   let take_2d =
-    let module L = Low_discrepancy in
     let samples_index = ref 2 in
     fun () ->
       let j = !samples_index in
@@ -97,8 +97,8 @@ let render_tile t tile scene write_pixel tile_sampler =
       let xf = Float.of_int x in
       let color = ref Color.black in
       for _ = 1 to t.samples_per_pixel do
-        let s = Low_discrepancy.step tile_sampler in
-        let dx = Low_discrepancy.Sample.get s 0 and dy = Low_discrepancy.Sample.get s 1 in
+        let s = L.step tile_sampler in
+        let dx = L.Sample.get s 0 and dy = L.Sample.get s 1 in
         let cx = (xf +. dx) *. widthf in
         let cy = (yf +. dy) *. heightf in
         let ray = Scene.camera_ray scene cx cy in
@@ -109,10 +109,10 @@ let render_tile t tile scene write_pixel tile_sampler =
   done
 
 let create_tile_samplers t tiles =
-  let s = ref (Low_discrepancy.create (2 + (2 * (t.max_bounces + 1)))) in
+  let s = ref (L.create ~dimension:(2 + (2 * (t.max_bounces + 1)))) in
   List.map tiles ~f:(fun tile ->
       let n = t.samples_per_pixel * Tile.area tile in
-      let tile_sampler, suffix = Low_discrepancy.split_at !s n in
+      let tile_sampler, suffix = L.split_at !s n in
       s := suffix ;
       (tile, tile_sampler) )
 
