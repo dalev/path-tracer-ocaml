@@ -91,13 +91,15 @@ let render_tile t tile scene write_pixel tile_sampler =
   let widthf = 1 // t.width in
   let heightf = 1 // t.height in
   let spp_invf = 1 // t.samples_per_pixel in
+  let sampler = ref tile_sampler in
   for y = y0 to y0 + tile.Tile.height do
     let yf = Float.of_int (t.height - 1 - y) in
     for x = x0 to x0 + tile.Tile.width do
       let xf = Float.of_int x in
       let color = ref Color.black in
       for _ = 1 to t.samples_per_pixel do
-        let s = L.step tile_sampler in
+        let sampler', s = L.step !sampler in
+        sampler := sampler' ;
         let dx = L.Sample.get s 0 and dy = L.Sample.get s 1 in
         let cx = (xf +. dx) *. widthf in
         let cy = (yf +. dy) *. heightf in
