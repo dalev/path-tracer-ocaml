@@ -1,3 +1,3 @@
 (tests
  (names path_tracer_test low_discrepancy_sequence_test)
- (libraries path_tracer low_discrepancy_sequence base alcotest))
+ (libraries path_tracer low_discrepancy_sequence alcotest))

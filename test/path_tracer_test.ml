@@ -1,4 +1,3 @@
-open! Base
 open Path_tracer
 
 let unit_bbox = Bbox.create ~min:P3.origin ~max:(P3.create ~x:1.0 ~y:1.0 ~z:1.0)
