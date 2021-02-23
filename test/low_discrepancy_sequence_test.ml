@@ -10,7 +10,7 @@ let integrate_1d f lower upper ~iterations =
   let sample () =
     let l', s = L.step !l in
     l := l' ;
-    scale_sample ~lower ~upper @@ L.Sample.get s 0 in
+    scale_sample ~lower ~upper @@ L.Sample.(s.%{0}) in
   let neg_sum = ref 0.0 and pos_sum = ref 0.0 in
   for _ = 0 to iterations - 1 do
     let x = sample () in

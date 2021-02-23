@@ -7,6 +7,9 @@ module Sample : sig
 
   val get : t -> int -> float
   (** [get s i] selects the i'th component of the sample vector [s] (0-based). *)
+
+  val ( .%{} ) : t -> int -> float
+  (** [s.%{i}] is the same as [get s i]*)
 end
 
 (** [t] is a representation of an unbounded sequence of sample vectors. *)

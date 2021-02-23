@@ -1,5 +1,10 @@
 module FArray = Float.Array
-module Sample = struct include FArray end
+
+module Sample = struct
+  include FArray
+
+  let ( .%{} ) = get
+end
 
 type t = {current: floatarray; alpha: floatarray}
 

@@ -1,5 +1,5 @@
 open! Base
-open Stdio
+open Lwt.Syntax
 open Path_tracer
 module Image = Bimage.Image
 module Pixel = Bimage.Pixel
@@ -131,18 +131,24 @@ let main args =
     Integrator.create ~width ~height ~write_pixel ~max_bounces ~samples_per_pixel:spp
   in
   let spheres = Random.init 42 ; Shirley_spheres.spheres () in
-  printf "dim = %d x %d;\n" width height ;
-  printf "#spheres = %d\n" (List.length spheres) ;
+  let* () = Lwt_io.printf "dim = %d x %d;\n" width height in
+  let* () = Lwt_io.printf "#spheres = %d\n" (List.length spheres) in
   let update_progress =
-    if no_progress then None else Some (fun pct -> printf "\rProgress: %3.1f%%%!" pct)
+    if no_progress then
+      None
+    else
+      Some (fun pct -> Lwt_io.printf "\rProgress: %3.1f%%" pct) in
+  let* () =
+    Integrator.render ?update_progress i
+      (Scene.create (camera (width // height)) spheres ~background)
   in
-  Integrator.render ?update_progress i
-    (Scene.create (camera (width // height)) spheres ~background) ;
-  printf "\n" ;
-  ( match Bimage_io.write output img with
-  | Ok () -> ()
-  | Error (`File_not_found f) -> printf "File not found: %s" f
-  | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other) ) ;
-  printf "Done\n"
+  let* () = Lwt_io.printf "\n" in
+  let* () =
+    match Bimage_io.write output img with
+    | Ok () -> Lwt.return_unit
+    | Error (`File_not_found f) -> Lwt_io.printf "File not found: %s" f
+    | Error (#Bimage.Error.t as other) -> Lwt.return @@ Bimage.Error.unwrap (Error other)
+  in
+  Lwt_io.printf "Done\n"
 
-let () = main (Args.parse ())
+let () = Lwt_main.run @@ main (Args.parse ())

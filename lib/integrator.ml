@@ -1,5 +1,5 @@
 open! Base
-open! Stdio
+open Lwt.Syntax
 module L = Low_discrepancy_sequence
 
 type t =
@@ -45,10 +45,11 @@ end
 
 let trace_ray ray scene max_bounces samples =
   let take_2d =
+    let open L.Sample in
     let samples_index = ref 2 in
     fun () ->
       let j = !samples_index in
-      let u = L.Sample.get samples j and v = L.Sample.get samples (j + 1) in
+      let u = samples.%{j} and v = samples.%{j + 1} in
       samples_index := j + 2 ;
       (u, v) in
   let diffuse_plus_light = Scene.diffuse_plus_light_pdf scene in
@@ -104,7 +105,8 @@ let render_tile t tile scene write_pixel tile_sampler =
       for _ = 1 to t.samples_per_pixel do
         let sampler', s = L.step !sampler in
         sampler := sampler' ;
-        let dx = L.Sample.get s 0 and dy = L.Sample.get s 1 in
+        let open L.Sample in
+        let dx = s.%{0} and dy = s.%{1} in
         let cx = (xf +. dx) *. widthf in
         let cy = (yf +. dy) *. heightf in
         let ray = Scene.camera_ray scene cx cy in
@@ -122,12 +124,18 @@ let create_tile_samplers t tiles =
       s := suffix ;
       (tile, tile_sampler) )
 
-let render ?(update_progress = ignore) t scene =
+let render ?(update_progress = fun _ -> Lwt.return ()) t scene =
   let max_area = 32 * 32 in
   let tiles = Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height) in
   let num_tiles = List.length tiles in
   let tiles_and_samplers = create_tile_samplers t tiles in
-  printf "#tiles = %d\n" num_tiles ;
-  List.iteri tiles_and_samplers ~f:(fun i (tile, sampler) ->
-      render_tile t tile scene t.write_pixel sampler ;
-      update_progress ((i + 1) * 100 // num_tiles) )
+  let* () = Lwt_io.printf "#tiles = %d\n" num_tiles in
+  tiles_and_samplers
+  |> Lwt_list.iteri_s (fun i (tile, sampler) ->
+         let* () =
+           (* detach so that the progress output can flush *)
+           Lwt_preemptive.detach
+             (fun () -> render_tile t tile scene t.write_pixel sampler)
+             ()
+         in
+         update_progress ((i + 1) * 100 // num_tiles) )

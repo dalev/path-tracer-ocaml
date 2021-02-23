@@ -8,4 +8,4 @@ val create :
   -> max_bounces:int
   -> t
 
-val render : ?update_progress:(float -> unit) -> t -> Scene.t -> unit
+val render : ?update_progress:(float -> unit Lwt.t) -> t -> Scene.t -> unit Lwt.t
