@@ -19,7 +19,7 @@ module V3 : sig
   val unit_x : t
   val unit_y : t
   val unit_z : t
-  val axis : t -> Axis.t -> float
+  val axis : Axis.t -> t -> float
   val quadrance : t -> float
   val dot : t -> t -> float
   val cross : t -> t -> t
@@ -46,7 +46,7 @@ module P3 : sig
   val pp : Caml.Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
   val create : x:float -> y:float -> z:float -> t
   val coords : t -> float * float * float
-  val axis : t -> Axis.t -> float
+  val axis : Axis.t -> t -> float
   val origin : t
   val translate : t -> V3.t -> t
   val to_v3 : t -> V3.t

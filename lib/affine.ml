@@ -18,7 +18,7 @@ module V3 = struct
   let unit_x = create ~x:1.0 ~y:0.0 ~z:0.0
   let unit_y = create ~x:0.0 ~y:1.0 ~z:0.0
   let unit_z = create ~x:0.0 ~y:0.0 ~z:1.0
-  let axis {x; y; z} a = match (a : Axis.t) with X -> x | Y -> y | Z -> z
+  let axis a = match (a : Axis.t) with X -> x | Y -> y | Z -> z
   let map {x; y; z} ~f = {x= f x; y= f y; z= f z}
   let map2 a b ~f = {x= f a.x b.x; y= f a.y b.y; z= f a.z b.z}
   let of_float a = {x= a; y= a; z= a}

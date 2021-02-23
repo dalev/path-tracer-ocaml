@@ -1,6 +1,6 @@
 open Base
 
-type t = Leaf of Shape.t | Branch of Bbox.t * t * t
+type t = Leaf of Shape.t | Branch of Bbox.t * (V3.t -> float) * t * t
 
 module Bshape = struct
   type t = {shape: Shape.t; bbox: Bbox.t; centroid: P3.t}
@@ -69,12 +69,20 @@ let create shapes =
         let s = Slice.get shapes 0 in
         let s' = Slice.get shapes 1 in
         let box = Bbox.union (Bshape.bbox s) (Bshape.bbox s') in
-        Branch (box, Bshape.leaf s, Bshape.leaf s')
+        let axis =
+          let cbox = centroid_bbox shapes in
+          Bbox.longest_axis cbox in
+        let lhs, rhs =
+          let open Float.O in
+          if P3.axis axis (Bshape.centroid s) < P3.axis axis (Bshape.centroid s') then
+            (s, s')
+          else (s', s) in
+        Branch (box, V3.axis axis, Bshape.leaf lhs, Bshape.leaf rhs)
     | _ -> (
         clear_bins () ;
         let cbox = centroid_bbox shapes in
         let longest_axis = Bbox.longest_axis cbox in
-        let to_axis v = P3.axis v longest_axis in
+        let to_axis = P3.axis longest_axis in
         let to_bin =
           let epsilon = 1e-6 in
           let cb_min = to_axis (Bbox.min cbox) in
@@ -110,7 +118,7 @@ let create shapes =
             if Float.( < ) leaf_cost split_cost then failwith "to do: Bvh multi-leaf"
             else
               let lhs, rhs = Slice.partition_in_place shapes p to_bin in
-              Branch (total_bbox, loop lhs, loop rhs) ) in
+              Branch (total_bbox, V3.axis longest_axis, loop lhs, loop rhs) ) in
   match shapes with
   | [] -> failwith "BUG: Bvh.create got empty list of shapes"
   | hd :: _ ->
@@ -126,8 +134,11 @@ let intersect t ray ~t_min ~t_max =
       match Shape.intersect s ray ~t_min ~t_max with
       | None -> accum
       | Some t_hit -> Some (t_hit, s) )
-    | Branch (bbox, lhs, rhs) ->
+    | Branch (bbox, to_axis, lhs, rhs) ->
         if Bbox.is_hit bbox ray ~t_min ~t_max then
+          let lhs, rhs =
+            if Float.is_negative @@ to_axis (Ray.direction ray) then (rhs, lhs)
+            else (lhs, rhs) in
           let lhs_ans = loop lhs ray ~t_min ~t_max accum in
           let t_max = match lhs_ans with None -> t_max | Some (t_hit, _) -> t_hit in
           loop rhs ray ~t_min ~t_max lhs_ans
