@@ -1,4 +1,5 @@
 (executable
  (public_name path_tracer)
+ (package path_tracer)
  (name main)
  (libraries path_tracer base stdio bimage bimage-io))

@@ -1,4 +1,4 @@
-(executable
- (name bench)
+(executables
+ (names intersect_bench low_discrepancy_sequence_bench)
  (ocamlopt_flags :standard)
- (libraries path_tracer core_bench))
+ (libraries path_tracer low_discrepancy_sequence core_bench))
