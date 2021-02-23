@@ -1,3 +1,2 @@
 (library
- (public_name low_discrepancy_sequence)
  (name low_discrepancy_sequence))
