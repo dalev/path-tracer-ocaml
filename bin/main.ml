@@ -84,11 +84,13 @@ module Shirley_spheres = struct
   let random_material () =
     let open Float.O in
     let roll = randomf () in
-    if roll < 0.8 then random_lambertian ()
+    if roll < 0.8 then
+      random_lambertian ()
     else if roll < 0.95 then
       let z = (0.5 * randomf ()) + 0.5 in
       Material.metal (solid_tex z z z)
-    else Material.glass
+    else
+      Material.glass
 
   let perturb x = Float.of_int x +. (0.9 *. randomf ())
 
@@ -101,7 +103,8 @@ module Shirley_spheres = struct
     if Float.( > ) (V3.quadrance (V3.of_points ~src:center ~tgt:p)) 0.81 then
       let material = random_material () in
       Some (Shape.sphere ~material ~center ~radius)
-    else None
+    else
+      None
 
   let spheres () =
     let rng = List.range (-11) 11 ~start:`inclusive ~stop:`inclusive in

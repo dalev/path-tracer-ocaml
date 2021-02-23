@@ -41,7 +41,8 @@ module Geometry = struct
         let b' = V3.dot f d in
         let a = V3.quadrance d in
         let discrim = r2 - V3.quadrance (V3.Infix.( - ) (V3.scale d (b' / a)) f) in
-        if discrim < 0.0 then None
+        if discrim < 0.0 then
+          None
         else
           let sign_b' = Sign.to_float (Float.sign_exn b') in
           let q = b' + (sign_b' * Float.sqrt (a * discrim)) in

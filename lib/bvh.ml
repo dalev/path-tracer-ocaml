@@ -76,7 +76,8 @@ let create shapes =
           let open Float.O in
           if P3.axis axis (Bshape.centroid s) < P3.axis axis (Bshape.centroid s') then
             (s, s')
-          else (s', s) in
+          else
+            (s', s) in
         Branch (box, V3.axis axis, Bshape.leaf lhs, Bshape.leaf rhs)
     | _ -> (
         clear_bins () ;
@@ -115,7 +116,8 @@ let create shapes =
               (Slice.length shapes) ()
         | Some (p, split_cost) ->
             let leaf_cost = leaf_cost (Slice.length shapes) in
-            if Float.( < ) leaf_cost split_cost then failwith "to do: Bvh multi-leaf"
+            if Float.( < ) leaf_cost split_cost then
+              failwith "to do: Bvh multi-leaf"
             else
               let lhs, rhs = Slice.partition_in_place shapes p to_bin in
               Branch (total_bbox, V3.axis longest_axis, loop lhs, loop rhs) ) in
@@ -137,12 +139,15 @@ let intersect t ray ~t_min ~t_max =
     | Branch (bbox, to_axis, lhs, rhs) ->
         if Bbox.is_hit bbox ray ~t_min ~t_max then
           let lhs, rhs =
-            if Float.is_negative @@ to_axis (Ray.direction ray) then (rhs, lhs)
-            else (lhs, rhs) in
+            if Float.is_negative @@ to_axis (Ray.direction ray) then
+              (rhs, lhs)
+            else
+              (lhs, rhs) in
           let lhs_ans = loop lhs ray ~t_min ~t_max accum in
           let t_max = match lhs_ans with None -> t_max | Some (t_hit, _) -> t_hit in
           loop rhs ray ~t_min ~t_max lhs_ans
-        else accum in
+        else
+          accum in
   match loop t ray ~t_min ~t_max None with
   | None -> None
   | Some (t_hit, shape) -> Some (Hit.create ~t_hit shape ray)

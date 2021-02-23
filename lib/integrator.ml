@@ -33,7 +33,8 @@ module Tile = struct
 
   let split t ~max_area =
     let rec loop t =
-      if area t <= max_area then [t]
+      if area t <= max_area then
+        [t]
       else
         let lhs, rhs = split_once t in
         loop lhs @ loop rhs in
@@ -52,7 +53,8 @@ let trace_ray ray scene max_bounces samples =
       (u, v) in
   let diffuse_plus_light = Scene.diffuse_plus_light_pdf scene in
   let rec loop ray max_bounces =
-    if max_bounces <= 0 then Color.black
+    if max_bounces <= 0 then
+      Color.black
     else
       let max_bounces = max_bounces - 1 in
       match Scene.intersect scene ray with
@@ -71,11 +73,13 @@ let trace_ray ray scene max_bounces samples =
               let ss = Hit.shader_space h in
               let dir = Pdf.sample diffuse_plus_light ss u v in
               let diffuse_pd = Pdf.eval Pdf.diffuse dir ss in
-              if Float.( = ) diffuse_pd 0.0 then emit
+              if Float.( = ) diffuse_pd 0.0 then
+                emit
               else
                 let divisor = Pdf.eval diffuse_plus_light dir ss in
                 let pd = diffuse_pd /. divisor in
-                if not (Float.is_finite pd) then emit
+                if not (Float.is_finite pd) then
+                  emit
                 else
                   let scattered_ray =
                     Ray.create (Hit.point h) (Shader_space.rotate_inv ss dir) in

@@ -8,8 +8,7 @@ let base_index t index = t.offset + index
 let get t index = t.base.(base_index t index)
 
 let fold t ~init ~f =
-  let rec loop acc i =
-    if i < t.length then loop (f acc (get t i)) (i + 1) else acc in
+  let rec loop acc i = if i < t.length then loop (f acc (get t i)) (i + 1) else acc in
   loop init 0
 
 let iter t ~f =

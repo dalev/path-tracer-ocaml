@@ -20,7 +20,8 @@ let scatter t ss tex_coord ~omega_i ~hit_front u =
   | Metal tex ->
       let omega_r = Shader_space.reflect ss omega_i in
       let _, _, z = V3.coords omega_r in
-      if Float.( <= ) z 0.0 then Scatter.Absorb
+      if Float.( <= ) z 0.0 then
+        Scatter.Absorb
       else
         let attenuation =
           let a = Texture.eval tex tex_coord in
@@ -36,9 +37,10 @@ let scatter t ss tex_coord ~omega_i ~hit_front u =
       let s = Float.sqrt (1.0 - Float.square c) in
       let refract_ratio = if hit_front then index_inv else index in
       let wo =
-        if refract_ratio * s > 1.0 || schlick_reflectance c refract_ratio > u
-        then Shader_space.reflect ss omega_i
-        else Shader_space.refract ss omega_i refract_ratio in
+        if refract_ratio * s > 1.0 || schlick_reflectance c refract_ratio > u then
+          Shader_space.reflect ss omega_i
+        else
+          Shader_space.refract ss omega_i refract_ratio in
       Scatter.Specular (Shader_space.rotate_inv ss wo, Color.white)
 
 let emit (_ : t) (_ : Texture.Coord.t) = Color.black

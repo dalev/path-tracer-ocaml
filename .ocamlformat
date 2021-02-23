@@ -1,3 +1,4 @@
 version=0.17.0
 profile=compact
 margin=90
+if-then-else=fit-or-vertical

@@ -1,6 +1,4 @@
-type t =
-  | Solid of Color.t
-  | Checker of {width: int; height: int; even: t; odd: t}
+type t = Solid of Color.t | Checker of {width: int; height: int; even: t; odd: t}
 
 module Coord = struct
   type t = float * float
