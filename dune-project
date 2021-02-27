@@ -7,3 +7,5 @@
 
 (package
  (name low_discrepancy_sequence))
+
+(generate_opam_files true)
