@@ -7,10 +7,12 @@ type t =
   ; height: int
   ; write_pixel: x:int -> y:int -> Color.t -> unit
   ; samples_per_pixel: int
-  ; max_bounces: int }
+  ; max_bounces: int
+  ; trace_path:
+      cx:float -> cy:float -> int -> Low_discrepancy_sequence.Sample.t -> Color.t }
 
-let create ~width ~height ~write_pixel ~samples_per_pixel ~max_bounces =
-  {width; height; write_pixel; samples_per_pixel; max_bounces}
+let create ~width ~height ~write_pixel ~samples_per_pixel ~max_bounces ~trace_path =
+  {width; height; write_pixel; samples_per_pixel; max_bounces; trace_path}
 
 module Tile = struct
   type t = {row: int; col: int; width: int; height: int}
@@ -43,52 +45,9 @@ module Tile = struct
   let create ~width ~height = {row= 0; col= 0; width; height}
 end
 
-let trace_ray ray scene max_bounces samples =
-  let take_2d =
-    let open L.Sample in
-    let samples_index = ref 2 in
-    fun () ->
-      let j = !samples_index in
-      let u = samples.%{j} and v = samples.%{j + 1} in
-      samples_index := j + 2 ;
-      (u, v) in
-  let diffuse_plus_light = Scene.diffuse_plus_light_pdf scene in
-  let rec loop ray max_bounces =
-    if max_bounces <= 0 then
-      Color.black
-    else
-      let max_bounces = max_bounces - 1 in
-      match Scene.intersect scene ray with
-      | None -> Scene.background scene ray
-      | Some h -> (
-          let emit = Hit.emit h in
-          let u, v = take_2d () in
-          match (Hit.scatter h u : Scatter.t) with
-          | Absorb -> emit
-          | Specular (scattered_ray, attenuation) ->
-              let open Color.Infix in
-              emit + (attenuation * loop scattered_ray max_bounces)
-          | Diffuse attenuation ->
-              let open Color.Infix in
-              let ss = Hit.shader_space h in
-              let dir = Pdf.sample diffuse_plus_light ss u v in
-              let diffuse_pd = Pdf.eval Pdf.diffuse dir ss in
-              if Float.( = ) diffuse_pd 0.0 then
-                emit
-              else
-                let divisor = Pdf.eval diffuse_plus_light dir ss in
-                let pd = diffuse_pd /. divisor in
-                if not (Float.is_finite pd) then
-                  emit
-                else
-                  let scattered_ray = Shader_space.world_ray ss dir in
-                  emit + (Color.scale attenuation pd * loop scattered_ray max_bounces) )
-  in
-  loop ray max_bounces
-
 let gamma = Color.map ~f:Float.sqrt
 
-let render_tile t tile scene write_pixel tile_sampler =
+let render_tile t tile tile_sampler =
   let x0 = tile.Tile.col in
   let y0 = tile.Tile.row in
   let widthf = 1 // t.width in
@@ -107,10 +66,9 @@ let render_tile t tile scene write_pixel tile_sampler =
         let dx = s.%{0} and dy = s.%{1} in
         let cx = (xf +. dx) *. widthf in
         let cy = (yf +. dy) *. heightf in
-        let ray = Scene.camera_ray scene cx cy in
-        color := Color.Infix.( + ) !color @@ trace_ray ray scene t.max_bounces s
+        color := Color.Infix.( + ) !color @@ t.trace_path ~cx ~cy t.max_bounces s
       done ;
-      write_pixel ~x ~y @@ gamma (Color.scale !color spp_invf)
+      t.write_pixel ~x ~y @@ gamma (Color.scale !color spp_invf)
     done
   done
 
@@ -122,7 +80,7 @@ let create_tile_samplers t tiles =
       s := suffix ;
       (tile, tile_sampler) )
 
-let render ?(update_progress = fun _ -> Lwt.return ()) t scene =
+let render ?(update_progress = fun _ -> Lwt.return ()) t =
   let max_area = 32 * 32 in
   let tiles = Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height) in
   let num_tiles = List.length tiles in
@@ -132,7 +90,5 @@ let render ?(update_progress = fun _ -> Lwt.return ()) t scene =
   |> Lwt_list.iteri_s (fun i (tile, sampler) ->
          let* () =
            (* detach so that the progress output can flush *)
-           Lwt_preemptive.detach
-             (fun () -> render_tile t tile scene t.write_pixel sampler)
-             () in
+           Lwt_preemptive.detach (fun () -> render_tile t tile sampler) () in
          update_progress ((i + 1) * 100 // num_tiles) )

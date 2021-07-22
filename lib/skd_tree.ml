@@ -26,6 +26,7 @@ module type S = sig
   val create : leaf_elt list -> t
   val depth : t -> int
   val length : t -> int
+  val intersect : t -> Ray.t -> float -> float -> Hit.t option
 end
 
 module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
@@ -59,6 +60,43 @@ module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
 
   let length = tree_cata ~branch:( + ) ~leaf:L.length
   let depth = tree_cata ~branch:(fun l r -> 1 + max l r) ~leaf:L.depth
+
+  let intersect t ray t_enter t_leave =
+    let d_inv = Ray.direction_inv ray in
+    let o = P3.to_v3 (Ray.origin ray) in
+    let open Float.O in
+    let solve_ray_plane to_axis p = (p - to_axis o) * to_axis d_inv in
+    let rec loop t found t_found t_enter t_leave k =
+      if t_found < t_enter then
+        k t_found found
+      else
+        match t with
+        | Leaf l -> (
+          match L.intersect l ray ~t_min:t_enter ~t_max:t_found with
+          | Some (t_hit, elt_hit) -> k t_hit (Some elt_hit)
+          | None -> k t_found found )
+        | Branch {to_axis; lhs_clip; rhs_clip; lhs; rhs} ->
+            let t_lhs = solve_ray_plane to_axis lhs_clip in
+            let t_rhs = solve_ray_plane to_axis rhs_clip in
+            let t_clip1, subtree1, t_clip2, subtree2 =
+              if to_axis d_inv >= 0.0 then
+                (t_lhs, lhs, t_rhs, rhs)
+              else
+                (t_rhs, rhs, t_lhs, lhs) in
+            let k =
+              if t_clip2 <= t_leave then
+                let t_enter = Float.max t_enter t_clip2 in
+                fun t_found found -> loop subtree2 found t_found t_enter t_leave k
+              else
+                k in
+            if t_enter <= t_clip1 then
+              let t_leave = Float.min t_leave t_clip1 in
+              loop subtree1 found t_found t_enter t_leave k
+            else
+              k t_found found in
+    let k0 t_hit found =
+      match found with None -> None | Some item -> Some (L.hit t_hit item ray) in
+    loop t None t_leave t_enter t_leave k0
 
   (* == Tree builder using Binned SAH == *)
 
@@ -95,7 +133,6 @@ module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
     type t = {cost: float; split_index: int; axis: Axis.t; on_lhs: Bshape.t -> bool}
 
     let cost t = t.cost
-    let split_index t = t.split_index
     let on_lhs t = t.on_lhs
     let axis t = t.axis
 

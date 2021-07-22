@@ -108,7 +108,7 @@ module Shirley_spheres = struct
 
   let spheres () =
     let rng = List.range (-11) 11 ~start:`inclusive ~stop:`inclusive in
-    ground :: big_spheres
+    (ground :: big_spheres)
     @ List.concat_map rng ~f:(fun a ->
           List.filter_map rng ~f:(fun b -> small_sphere a b) )
 end
@@ -127,9 +127,6 @@ let main args =
     let px = Pixel.empty Bimage.rgb in
     Pixel.set px 0 r ; Pixel.set px 1 g ; Pixel.set px 2 b ; Image.set_pixel img x y px
   in
-  let i =
-    Integrator.create ~width ~height ~write_pixel ~max_bounces ~samples_per_pixel:spp
-  in
   let spheres = Random.init 42 ; Shirley_spheres.spheres () in
   let* () = Lwt_io.printf "dim = %d x %d;\n" width height in
   let* () = Lwt_io.printf "#spheres = %d\n" (List.length spheres) in
@@ -138,10 +135,11 @@ let main args =
       None
     else
       Some (fun pct -> Lwt_io.printf "\rProgress: %3.1f%%" pct) in
-  let* () =
-    Integrator.render ?update_progress i
-      (Scene.create (camera (width // height)) spheres ~background)
-  in
+  let scene = Scene.create (camera (width // height)) spheres ~background in
+  let i =
+    Integrator.create ~width ~height ~write_pixel ~max_bounces ~samples_per_pixel:spp
+      ~trace_path:(Staged.unstage (Scene.path_tracer scene)) in
+  let* () = Integrator.render ?update_progress i in
   let* () = Lwt_io.printf "\n" in
   let* () =
     match Bimage_io.write output img with

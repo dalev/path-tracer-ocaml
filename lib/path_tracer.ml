@@ -7,6 +7,7 @@ module P3 = Affine.P3
 module Ray = Ray
 module Scene = Scene
 module Shape = Shape
+module Sphere = Sphere
 module Slice = Slice
 module Texture = Texture
 module V3 = Affine.V3
