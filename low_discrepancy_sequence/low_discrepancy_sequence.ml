@@ -20,7 +20,8 @@ let phi_approx d =
     if x = x' then x else loop x' in
   loop 2.0
 
-let clamp x = mod_float (0.5 +. x) 1.0
+let fractional x = x -. Float.trunc x
+let clamp x = fractional (0.5 +. x)
 let clamp_add a b = clamp @@ (a +. b)
 
 let create ~dimension =
