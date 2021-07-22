@@ -37,6 +37,10 @@ let refract (_ : t) wi index =
     V3.create ~x:0.0 ~y:0.0 ~z:(-.Float.sqrt (Float.abs (1.0 -. V3.quadrance perp))) in
   V3.Infix.(perp + para)
 
+let world_ray t dir_ss =
+  let dir = rotate_inv t dir_ss in
+  Ray.create (P3.translate t.origin (V3.scale dir 1e-3)) dir
+
 let unit_square_to_hemisphere u v =
   let open Float.O in
   let r = Float.sqrt u in
@@ -45,3 +49,7 @@ let unit_square_to_hemisphere u v =
   let y = r * Float.sin theta in
   let z = Float.sqrt (1.0 - u) in
   V3.create ~x ~y ~z
+
+let omega_i t ray =
+  let world_dir = V3.Infix.( ~- ) (V3.normalize (Ray.direction ray)) in
+  rotate t world_dir

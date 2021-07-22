@@ -65,8 +65,7 @@ let trace_ray ray scene max_bounces samples =
           let u, v = take_2d () in
           match (Hit.scatter h u : Scatter.t) with
           | Absorb -> emit
-          | Specular (scatter_dir, attenuation) ->
-              let scattered_ray = Ray.create (Hit.point h) scatter_dir in
+          | Specular (scattered_ray, attenuation) ->
               let open Color.Infix in
               emit + (attenuation * loop scattered_ray max_bounces)
           | Diffuse attenuation ->
@@ -82,8 +81,7 @@ let trace_ray ray scene max_bounces samples =
                 if not (Float.is_finite pd) then
                   emit
                 else
-                  let scattered_ray =
-                    Ray.create (Hit.point h) (Shader_space.rotate_inv ss dir) in
+                  let scattered_ray = Shader_space.world_ray ss dir in
                   emit + (Color.scale attenuation pd * loop scattered_ray max_bounces) )
   in
   loop ray max_bounces
@@ -136,6 +134,5 @@ let render ?(update_progress = fun _ -> Lwt.return ()) t scene =
            (* detach so that the progress output can flush *)
            Lwt_preemptive.detach
              (fun () -> render_tile t tile scene t.write_pixel sampler)
-             ()
-         in
+             () in
          update_progress ((i + 1) * 100 // num_tiles) )

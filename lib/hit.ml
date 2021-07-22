@@ -1,11 +1,4 @@
-type t =
-  { t_hit: float
-  ; point: P3.t
-  ; shape: Shape.t
-  ; shader_space: Shader_space.t
-  ; tex_coord: Texture.Coord.t
-  ; ray: Ray.t
-  ; hit_front: bool }
+type t = {shader_space: Shader_space.t; emit: Color.t; do_scatter: float -> Scatter.t}
 
 let create ~t_hit shape ray =
   let point = Ray.point_at ray t_hit in
@@ -14,21 +7,12 @@ let create ~t_hit shape ray =
   let normal = if hit_front then normal else V3.Infix.( ~- ) normal in
   let tex_coord = Shape.tex_coord shape ~surface:point ~normal in
   let shader_space = Shader_space.create normal point in
-  {t_hit; point; shape; shader_space; tex_coord; ray; hit_front}
+  let m = Shape.material shape in
+  let emit = Material.emit m tex_coord in
+  let omega_i = Shader_space.omega_i shader_space ray in
+  let do_scatter = Material.scatter m shader_space tex_coord ~omega_i ~hit_front in
+  {shader_space; emit; do_scatter}
 
-let t_hit t = t.t_hit
-
-let omega_i t =
-  let v = V3.Infix.( ~- ) @@ V3.normalize @@ Ray.direction t.ray in
-  Shader_space.rotate t.shader_space v
-
-let point t = t.point
-
-let scatter t u =
-  let m = Shape.material t.shape in
-  let hit_front = t.hit_front in
-  Material.scatter m t.shader_space t.tex_coord ~omega_i:(omega_i t) ~hit_front u
-
-let material t = Shape.material t.shape
-let emit t = Material.emit (material t) t.tex_coord
+let scatter t u = t.do_scatter u
+let emit t = t.emit
 let shader_space t = t.shader_space
