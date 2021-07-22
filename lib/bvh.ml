@@ -119,7 +119,8 @@ let create shapes =
             if Float.( < ) leaf_cost split_cost then
               failwith "to do: Bvh multi-leaf"
             else
-              let lhs, rhs = Slice.partition_in_place shapes p to_bin in
+              let on_lhs s = to_bin s <= p in
+              let lhs, rhs = Slice.partition_in_place shapes ~on_lhs in
               Branch (total_bbox, V3.axis longest_axis, loop lhs, loop rhs) ) in
   match shapes with
   | [] -> failwith "BUG: Bvh.create got empty list of shapes"

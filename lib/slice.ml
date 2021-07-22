@@ -22,14 +22,14 @@ let split_at t i =
   let rhs = {t with offset= t.offset + i; length= t.length - i} in
   (lhs, rhs)
 
-let partition_in_place t p to_bin =
+let partition_in_place t ~on_lhs =
   let i = ref 0 in
   let j = ref (length t - 1) in
   while !i < !j do
-    while to_bin (get t !i) <= p do
+    while on_lhs (get t !i) do
       Int.incr i
     done ;
-    while to_bin (get t !j) > p do
+    while not @@ on_lhs (get t !j) do
       Int.decr j
     done ;
     if !i < !j then Array.swap t.base (base_index t !i) (base_index t !j)
