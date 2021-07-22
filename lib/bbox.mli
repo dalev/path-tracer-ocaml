@@ -6,5 +6,6 @@ val min : t -> P3.t
 val max : t -> P3.t
 val center : t -> P3.t
 val union : t -> t -> t
+val union_opt : t option -> t option -> t option
 val longest_axis : t -> Axis.t
 val surface_area : t -> float

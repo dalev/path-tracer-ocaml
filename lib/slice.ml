@@ -6,6 +6,8 @@ let create base = {base; offset= 0; length= Array.length base}
 let length t = t.length
 let base_index t index = t.offset + index
 let get t index = t.base.(base_index t index)
+let to_array_map t ~f = Array.init t.length ~f:(fun i -> f (get t i))
+let to_array t = to_array_map t ~f:Fn.id
 
 let fold t ~init ~f =
   let rec loop acc i = if i < t.length then loop (f acc (get t i)) (i + 1) else acc in

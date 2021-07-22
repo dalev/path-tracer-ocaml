@@ -32,10 +32,7 @@ module Bin = struct
     in
     {count= t.count + 1; bounds}
 
-  let join_bounds t t' =
-    match (t.bounds, t'.bounds) with
-    | None, other | other, None -> other
-    | Some b, Some b' -> Some (Bbox.union b b')
+  let join_bounds t t' = Bbox.union_opt t.bounds t'.bounds
 
   let join t t' =
     let bounds = join_bounds t t' in

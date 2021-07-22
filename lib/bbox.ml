@@ -12,6 +12,11 @@ let union t t' =
   let max = P3.map2 ~f:Float.max t.max t'.max in
   create ~min ~max
 
+let union_opt o o' =
+  match (o, o') with
+  | None, other | other, None -> other
+  | Some t, Some t' -> Some (union t t')
+
 let longest_axis {min; max} =
   let open Float.O in
   let x, y, z = P3.coords P3.Infix.(max - min) in
