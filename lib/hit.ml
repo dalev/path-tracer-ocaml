@@ -1,6 +1,9 @@
+open Base
+
 type t = {shader_space: Shader_space.t; emit: Color.t; do_scatter: float -> Scatter.t}
 
 let create ~t_hit shape ray =
+  let open Float.O in
   let point = Ray.point_at ray t_hit in
   let normal = Shape.normal shape point in
   let hit_front = V3.dot (Ray.direction ray) normal < 0.0 in
