@@ -134,10 +134,14 @@ let main args =
       None
     else
       Some (fun pct -> Lwt_io.printf "\rProgress: %3.1f%%" pct) in
-  let scene = Scene.create (camera (width // height)) spheres ~background in
+  let camera = camera (width // height) in
   let i =
+    let bvh =
+      List.map spheres ~f:(fun s -> Shape.transform s ~f:(Camera.transform camera))
+      |> Bvh.create in
+    let intersect r = Bvh.intersect bvh r ~t_min:0.0 ~t_max:Float.max_finite_value in
     Integrator.create ~width ~height ~write_pixel ~max_bounces ~samples_per_pixel:spp
-      ~trace_path:(Staged.unstage (Scene.path_tracer scene)) in
+      ~intersect ~background ~camera ~diffuse_plus_light:Pdf.diffuse in
   let* () = Integrator.render ?update_progress i in
   let* () = Lwt_io.printf "\n" in
   let* () =

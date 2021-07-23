@@ -6,8 +6,10 @@ val create :
   -> write_pixel:(x:int -> y:int -> Color.t -> unit)
   -> samples_per_pixel:int
   -> max_bounces:int
-  -> trace_path:
-       (cx:float -> cy:float -> int -> Low_discrepancy_sequence.Sample.t -> Color.t)
+  -> camera:Camera.t
+  -> intersect:(Ray.t -> Hit.t option)
+  -> background:(Ray.t -> Color.t)
+  -> diffuse_plus_light:Pdf.t
   -> t
 
 val render : ?update_progress:(float -> unit Lwt.t) -> t -> unit Lwt.t

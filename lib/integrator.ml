@@ -8,11 +8,60 @@ type t =
   ; write_pixel: x:int -> y:int -> Color.t -> unit
   ; samples_per_pixel: int
   ; max_bounces: int
+  ; camera: Camera.t
   ; trace_path:
       cx:float -> cy:float -> int -> Low_discrepancy_sequence.Sample.t -> Color.t }
 
-let create ~width ~height ~write_pixel ~samples_per_pixel ~max_bounces ~trace_path =
-  {width; height; write_pixel; samples_per_pixel; max_bounces; trace_path}
+let path_tracer ~intersect ~background ~diffuse_plus_light ~camera =
+  Staged.stage
+  @@ fun ~cx ~cy max_bounces samples ->
+  let ray = Camera.ray camera cx cy in
+  let take_2d =
+    let open L.Sample in
+    let samples_index = ref 2 in
+    fun () ->
+      let j = !samples_index in
+      let u = samples.%{j} and v = samples.%{j + 1} in
+      samples_index := j + 2 ;
+      (u, v) in
+  let rec loop ray max_bounces =
+    if max_bounces <= 0 then
+      Color.black
+    else
+      let max_bounces = max_bounces - 1 in
+      match intersect ray with
+      | None -> background ray
+      | Some h -> (
+          let emit = Hit.emit h in
+          let u, v = take_2d () in
+          match (Hit.scatter h u : Scatter.t) with
+          | Absorb -> emit
+          | Specular (scattered_ray, attenuation) ->
+              let open Color.Infix in
+              emit + (attenuation * loop scattered_ray max_bounces)
+          | Diffuse attenuation ->
+              let open Color.Infix in
+              let ss = Hit.shader_space h in
+              let dir = Pdf.sample diffuse_plus_light ss u v in
+              let diffuse_pd = Pdf.eval Pdf.diffuse dir ss in
+              if Float.( = ) diffuse_pd 0.0 then
+                emit
+              else
+                let divisor = Pdf.eval diffuse_plus_light dir ss in
+                let pd = diffuse_pd /. divisor in
+                if not (Float.is_finite pd) then
+                  emit
+                else
+                  let scattered_ray = Shader_space.world_ray ss dir in
+                  emit + (Color.scale attenuation pd * loop scattered_ray max_bounces) )
+  in
+  loop ray max_bounces
+
+let create ~width ~height ~write_pixel ~samples_per_pixel ~max_bounces ~camera ~intersect
+    ~background ~diffuse_plus_light =
+  let trace_path =
+    Staged.unstage @@ path_tracer ~intersect ~background ~diffuse_plus_light ~camera in
+  {width; height; write_pixel; samples_per_pixel; max_bounces; camera; trace_path}
 
 module Tile = struct
   type t = {row: int; col: int; width: int; height: int}
