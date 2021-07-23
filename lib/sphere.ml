@@ -42,7 +42,7 @@ let intersect {center; radius; _} ray ~t_min ~t_max =
     let t_hit = if c > 0.0 then c / q else q / a in
     if t_min <= t_hit && t_hit <= t_max then Some t_hit else None
 
-let hit ~t_hit t ray =
+let hit t t_hit ray =
   let open Float.O in
   let point = Ray.point_at ray t_hit in
   let normal = normal t point in

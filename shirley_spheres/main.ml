@@ -58,16 +58,16 @@ module Shirley_spheres = struct
     let a = solid_tex 0.2 0.3 0.1 in
     let b = solid_tex 0.9 0.9 0.9 in
     let checks = Material.lambertian @@ Texture.checker ~width:1000 ~height:2000 a b in
-    Shape.sphere ~material:checks ~center:(p3 0.0 (-1000.0) 0.0) ~radius:1000.0
+    Sphere.create ~material:checks ~center:(p3 0.0 (-1000.0) 0.0) ~radius:1000.0
 
   let big_spheres =
     let glass = Material.glass in
     let metal = Material.metal (solid_tex 0.7 0.6 0.5) in
     let blue = solid_lambertian 0.0 0.1 0.4 in
     let radius = 1.0 in
-    [ Shape.sphere ~material:glass ~center:(p3 (-4.0) 1.0 0.0) ~radius
-    ; Shape.sphere ~material:metal ~center:(p3 0.0 1.0 0.0) ~radius
-    ; Shape.sphere ~material:blue ~center:(p3 4.0 1.0 0.0) ~radius ]
+    [ Sphere.create ~material:glass ~center:(p3 (-4.0) 1.0 0.0) ~radius
+    ; Sphere.create ~material:metal ~center:(p3 0.0 1.0 0.0) ~radius
+    ; Sphere.create ~material:blue ~center:(p3 4.0 1.0 0.0) ~radius ]
 
   let randomf () = Random.float 1.0
 
@@ -102,7 +102,7 @@ module Shirley_spheres = struct
     let p = p3 4.0 radius 0.0 in
     if Float.( > ) (V3.quadrance (V3.of_points ~src:center ~tgt:p)) 0.81 then
       let material = random_material () in
-      Some (Shape.sphere ~material ~center ~radius)
+      Some (Sphere.create ~material ~center ~radius)
     else
       None
 
@@ -120,6 +120,31 @@ let background =
     let t = 0.5 *. (V3.dot d V3.unit_y +. 1.0) in
     Color.lerp t Color.white escape_color
 
+module Sphere_tree = Skd_tree.Make (struct
+  type t = Sphere.t array
+  type elt = Sphere.t
+
+  let length_cutoff = 8
+  let of_elts = Fn.id
+  let elt_bbox = Sphere.bbox
+  let hit = Sphere.hit
+  let depth _ = 0
+  let length = Array.length
+
+  let intersect t ray ~t_min ~t_max =
+    let t_max = ref t_max in
+    let item = ref None in
+    for i = 0 to Array.length t - 1 do
+      let s = t.(i) in
+      match Sphere.intersect s ray ~t_min ~t_max:!t_max with
+      | None -> ()
+      | Some t_hit ->
+          item := Some s ;
+          t_max := t_hit
+    done ;
+    match !item with None -> None | Some s -> Some (!t_max, s)
+end)
+
 let main args =
   let {Args.width; height; spp; output; no_progress; max_bounces} = args in
   let img = mkImage width height in
@@ -136,10 +161,11 @@ let main args =
       Some (fun pct -> Lwt_io.printf "\rProgress: %3.1f%%" pct) in
   let camera = camera (width // height) in
   let i =
-    let bvh =
-      List.map spheres ~f:(fun s -> Shape.transform s ~f:(Camera.transform camera))
-      |> Bvh.create in
-    let intersect r = Bvh.intersect bvh r ~t_min:0.0 ~t_max:Float.max_finite_value in
+    let tree =
+      List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
+      |> Sphere_tree.create in
+    let intersect r =
+      Sphere_tree.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value in
     Integrator.create ~width ~height ~write_pixel ~max_bounces ~samples_per_pixel:spp
       ~intersect ~background ~camera ~diffuse_plus_light:Pdf.diffuse in
   let* () = Integrator.render ?update_progress i in

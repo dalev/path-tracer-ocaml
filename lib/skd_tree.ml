@@ -13,7 +13,7 @@ module type Leaf = sig
   val length_cutoff : int
   val of_elts : elt array -> t
   val elt_bbox : elt -> Bbox.t
-  val hit : float -> elt -> Ray.t -> Hit.t
+  val hit : elt -> float -> Ray.t -> Hit.t
   val intersect : t -> Ray.t -> t_min:float -> t_max:float -> (float * elt) option
   val length : t -> int
   val depth : t -> int
@@ -26,7 +26,9 @@ module type S = sig
   val create : leaf_elt list -> t
   val depth : t -> int
   val length : t -> int
-  val intersect : t -> Ray.t -> float -> float -> Hit.t option
+
+  (* CR dalev: store top-level bbox to compute initial t-bounds *)
+  val intersect : t -> Ray.t -> t_min:float -> t_max:float -> Hit.t option
 end
 
 module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
@@ -61,7 +63,7 @@ module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
   let length = tree_cata ~branch:( + ) ~leaf:L.length
   let depth = tree_cata ~branch:(fun l r -> 1 + max l r) ~leaf:L.depth
 
-  let intersect t ray t_enter t_leave =
+  let intersect t ray ~t_min:t_enter ~t_max:t_leave =
     let d_inv = Ray.direction_inv ray in
     let o = P3.to_v3 (Ray.origin ray) in
     let open Float.O in
@@ -95,7 +97,7 @@ module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
             else
               k t_found found in
     let k0 t_hit found =
-      match found with None -> None | Some item -> Some (L.hit t_hit item ray) in
+      match found with None -> None | Some item -> Some (L.hit item t_hit ray) in
     loop t None t_leave t_enter t_leave k0
 
   (* == Tree builder using Binned SAH == *)
