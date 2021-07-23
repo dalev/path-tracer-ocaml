@@ -54,7 +54,8 @@ module V3 = struct
     scale v scalar
 
   let cross {x= a; y= b; z= c} {x= d; y= e; z= f} =
-    {x= (b *. f) -. (c *. e); y= (c *. d) -. (a *. f); z= (a *. e) -. (b *. d)}
+    let h w x y z = (w *. x) -. (y *. z) in
+    {x= h b f c e; y= h c d a f; z= h a e b d}
 end
 
 module P3 = struct
