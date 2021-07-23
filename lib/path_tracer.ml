@@ -13,3 +13,4 @@ module Slice = Slice
 module Sphere = Sphere
 module Texture = Texture
 module V3 = Affine.V3
+module Foreign = Foreign

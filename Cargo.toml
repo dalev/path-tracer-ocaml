@@ -1,0 +1,12 @@
+[package]
+name = "sphere-intersect"
+version = "0.1.0"
+authors = ["Dale Vaillancourt <dalev@alum.wpi.edu>"]
+edition = "2018"
+
+[lib]
+crate-type = ["staticlib", "cdylib"]
+path = "lib/lib.rs"
+
+[dependencies]
+ocaml = "*"
