@@ -2,7 +2,7 @@ open! Base
 open Lwt.Syntax
 open Path_tracer
 module Image = Bimage.Image
-module Pixel = Bimage.Pixel
+(* module Pixel = Bimage.Pixel *)
 
 module Args = struct
   type t =
@@ -113,20 +113,19 @@ module Shirley_spheres = struct
           List.filter_map rng ~f:(fun b -> small_sphere a b) )
 end
 
-let background ray =
-  let one = V3.of_float 1.0 in
-  let escape_color = V3.create ~x:0.5 ~y:0.7 ~z:1.0 in
-  let d = V3.normalize (Ray.direction ray) in
-  let t = 0.5 *. (V3.dot d V3.unit_y +. 1.0) in
-  Color.of_v3 (V3.lerp t one escape_color)
+let background =
+  let escape_color = Color.create ~r:0.5 ~g:0.7 ~b:1.0 in
+  fun ray ->
+    let d = V3.normalize (Ray.direction ray) in
+    let t = 0.5 *. (V3.dot d V3.unit_y +. 1.0) in
+    Color.lerp t Color.white escape_color
 
 let main args =
   let {Args.width; height; spp; output; no_progress; max_bounces} = args in
   let img = mkImage width height in
-  let write_pixel ~x ~y {Color.r; g; b} =
-    let px = Pixel.empty Bimage.rgb in
-    Pixel.set px 0 r ; Pixel.set px 1 g ; Pixel.set px 2 b ; Image.set_pixel img x y px
-  in
+  let write_pixel ~x ~y color =
+    let r, g, b = Color.to_rgb color in
+    Image.set img x y 0 r ; Image.set img x y 1 g ; Image.set img x y 2 b in
   let spheres = Random.init 42 ; Shirley_spheres.spheres () in
   let* () = Lwt_io.printf "dim = %d x %d;\n" width height in
   let* () = Lwt_io.printf "#spheres = %d\n" (List.length spheres) in
