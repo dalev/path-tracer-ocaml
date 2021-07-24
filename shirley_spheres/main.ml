@@ -220,7 +220,6 @@ module Leaf_lengths = struct
 end
 
 let main args =
-  let* () = Lwt_io.printf "%s\n" (Foreign.hello_world ()) in
   let {Args.width; height; spp; output; no_progress; max_bounces} = args in
   let img = mkImage width height in
   let write_pixel ~x ~y color =
