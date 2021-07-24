@@ -5,7 +5,7 @@ authors = ["Dale Vaillancourt <dalev@alum.wpi.edu>"]
 edition = "2018"
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "cdylib"]
 path = "lib/lib.rs"
 
 [dependencies]

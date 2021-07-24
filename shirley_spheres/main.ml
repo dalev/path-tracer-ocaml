@@ -150,7 +150,7 @@ module Spheres_leaf = struct
 
   type f64array = FArray.t
   type coords = {xs: f64array; ys: f64array; zs: f64array; rs: f64array}
-  type t = {coords: coords; ms: Material.t array}
+  type t = {coords: coords; ms: Material.t array; length: int}
   type elt = Sphere.t
   type float_ref = {mutable float_contents: float}
 
@@ -164,17 +164,23 @@ module Spheres_leaf = struct
   let length_cutoff = 32
 
   let of_elts elts =
-    let len = Array.length elts in
-    let farray axis = FArray.init len (fun i -> axis @@ Sphere.center elts.(i)) in
-    let xs = farray P3.x in
-    let ys = farray P3.y in
-    let zs = farray P3.z in
-    let rs = FArray.init len (fun i -> Sphere.radius elts.(i)) in
+    let elts_len = Array.length elts in
+    let pad_len =
+      let remainder = elts_len % 4 in
+      if remainder = 0 then 0 else 4 - remainder in
+    let len = elts_len + pad_len in
+    let farray in_bounds_f =
+      FArray.init len (fun i -> if i < elts_len then in_bounds_f elts.(i) else Float.nan)
+    in
+    let xs = farray (Fn.compose P3.x Sphere.center) in
+    let ys = farray (Fn.compose P3.y Sphere.center) in
+    let zs = farray (Fn.compose P3.z Sphere.center) in
+    let rs = farray Sphere.radius in
     let ms = Array.map elts ~f:Sphere.material in
-    {coords= {xs; ys; zs; rs}; ms}
+    {coords= {xs; ys; zs; rs}; ms; length= len}
 
   let depth _ = 0
-  let length t = Array.length t.ms
+  let length t = t.length
 
   let center t idx =
     let c = t.coords in
@@ -184,7 +190,7 @@ module Spheres_leaf = struct
   let intersect t ray ~t_min ~t_max =
     let t_hit_ref = {float_contents= Float.nan} in
     let idx = spheres_intersect_native t.coords t_min t_max ray t_hit_ref in
-    if idx < 0 then
+    if idx < 0 || idx >= Array.length t.ms then
       None
     else
       let t_hit = t_hit_ref.float_contents in

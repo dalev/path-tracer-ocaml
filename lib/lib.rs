@@ -65,7 +65,7 @@ pub extern "C" fn spheres_intersect_native(
     let rs = unsafe { make_slice(c[3]) };
     let o = V3::from(unsafe { make_slice(ray[0]) });
     let d = V3::from(unsafe { make_slice(ray[1]) });
-    let (t_found, found) = spheres_intersect_aux(xs, ys, zs, rs, o, d, t_min, t_max);
+    let (t_found, found) = unsafe { spheres_intersect_aux(xs, ys, zs, rs, o, d, t_min, t_max) };
     unsafe {
         *(t_hit_ref.0 as *mut f64) = t_found;
     }
@@ -74,25 +74,28 @@ pub extern "C" fn spheres_intersect_native(
 
 const LEAF_SIZE: usize = 32;
 
-type LeafF64s = [f64; LEAF_SIZE];
+mod simd {
+    #[cfg(target_arch = "x86_64")]
+    use core::arch::x86_64::*;
 
-fn sub_const(dst: &mut [f64], src: &[f64], rhs: f64) {
-    for (d, s) in dst.iter_mut().zip(src) {
-        *d = s - rhs
+    pub unsafe fn dot4(
+        vx: __m256d,
+        vy: __m256d,
+        vz: __m256d,
+        wx: __m256d,
+        wy: __m256d,
+        wz: __m256d,
+    ) -> __m256d {
+        _mm256_fmadd_pd(vx, wx, _mm256_fmadd_pd(vy, wy, _mm256_mul_pd(vz, wz)))
+    }
+
+    pub unsafe fn quadrance(vx: __m256d, vy: __m256d, vz: __m256d) -> __m256d {
+        dot4(vx, vy, vz, vx, vy, vz)
     }
 }
 
-fn vmul_add(dst: &mut [f64], src: &[f64], scalar: f64) {
-    for (d, f) in dst.iter_mut().zip(src) {
-        *d = f.mul_add(scalar, *d)
-    }
-}
-
-fn sq(x: f64) -> f64 {
-    x * x
-}
-
-fn spheres_intersect_aux(
+#[cfg(target_arch = "x86_64")]
+unsafe fn spheres_intersect_aux(
     xs: &[f64],
     ys: &[f64],
     zs: &[f64],
@@ -102,68 +105,60 @@ fn spheres_intersect_aux(
     t_min: f64,
     t_max: f64,
 ) -> (f64, isize) {
-    let len = xs.len();
-    // assert_eq!(len, LEAF_SIZE);
-    let mut r2s: LeafF64s = [0.0; LEAF_SIZE];
-    let mut fxs: LeafF64s = [0.0; LEAF_SIZE];
-    let mut fys: LeafF64s = [0.0; LEAF_SIZE];
-    let mut fzs: LeafF64s = [0.0; LEAF_SIZE];
-    for (dst, src) in r2s.iter_mut().zip(rs) {
-        *dst = src * src;
-    }
+    use core::arch::x86_64::*;
+    let mut t_hits = [0.0; LEAF_SIZE];
     let d_quadrance = d.quadrance();
-    sub_const(&mut fxs, &xs, o.x);
-    sub_const(&mut fys, &ys, o.y);
-    sub_const(&mut fzs, &zs, o.z);
-    let mut bps: LeafF64s = [0.0; LEAF_SIZE];
-    vmul_add(&mut bps, &fxs[0..len], d.x);
-    vmul_add(&mut bps, &fys[0..len], d.y);
-    vmul_add(&mut bps, &fzs[0..len], d.z);
-    // let discrim = r2 - (d.scale(bp / a) - f).quadrance();
-    let mut discrims = r2s;
-    for (dst, (bp, (fx, (fy, fz)))) in discrims[0..len]
-        .iter_mut()
-        .zip(bps.iter().zip(fxs.iter().zip(fys.iter().zip(fzs))))
+    let a = _mm256_set1_pd(d_quadrance);
+    let ox = _mm256_set1_pd(o.x);
+    let oy = _mm256_set1_pd(o.y);
+    let oz = _mm256_set1_pd(o.z);
+    let dx = _mm256_set1_pd(d.x);
+    let dy = _mm256_set1_pd(d.y);
+    let dz = _mm256_set1_pd(d.z);
+    for ((((x, y), z), r), dst_t_hit) in xs
+        .chunks_exact(4)
+        .zip(ys.chunks_exact(4))
+        .zip(zs.chunks_exact(4))
+        .zip(rs.chunks_exact(4))
+        .zip(t_hits.chunks_exact_mut(4))
     {
-        let s = bp / d_quadrance; // a == d_quadrance
-        let q = sq(d.x * s - fx) + sq(d.y * s - fy) + sq(d.z * s - fz);
-        *dst -= q
-    }
-    let mut t_max = t_max;
-    let mut found: isize = -1;
-    let mut cs = [0.0; LEAF_SIZE];
-    for (c, (&fx, (&fy, (&fz, r2)))) in cs[0..len]
-        .iter_mut()
-        .zip(fxs.iter().zip(fys.iter().zip(fzs.iter().zip(r2s))))
-    {
-        *c = sq(fx) + sq(fy) + sq(fz) - r2
-    }
-    for (i, (&c, (&bp, discrim))) in cs
-        .iter()
-        .zip(bps.iter().zip(discrims))
-        .enumerate()
-        .take(len)
-    {
-        let t_hit = intersect(discrim, d_quadrance, bp, c, t_min, t_max);
-        if !f64::is_nan(t_hit) {
-            t_max = t_hit;
-            found = i as isize;
-        }
-    }
-    (t_max, found)
-}
+        let x = _mm256_loadu_pd(x.as_ptr());
+        let y = _mm256_loadu_pd(y.as_ptr());
+        let z = _mm256_loadu_pd(z.as_ptr());
+        let r = _mm256_loadu_pd(r.as_ptr());
+        let r2 = _mm256_mul_pd(r, r);
+        // f = center - origin
+        let fx = _mm256_sub_pd(x, ox);
+        let fy = _mm256_sub_pd(y, oy);
+        let fz = _mm256_sub_pd(z, oz);
+        let c = _mm256_sub_pd(simd::quadrance(fx, fy, fz), r2);
+        // bp = dot(f, d)
+        let bp = simd::dot4(fx, fy, fz, dx, dy, dz);
+        let bp_over_a = _mm256_div_pd(bp, a);
+        // let w = d.scale(bp / a) - f
+        let wx = _mm256_fmsub_pd(dx, bp_over_a, fx);
+        let wy = _mm256_fmsub_pd(dy, bp_over_a, fy);
+        let wz = _mm256_fmsub_pd(dz, bp_over_a, fz);
+        let wq = simd::quadrance(wx, wy, wz);
+        let dis = _mm256_sub_pd(r2, wq);
 
-fn intersect(discrim: f64, a: f64, bp: f64, c: f64, t_min: f64, t_max: f64) -> f64 {
-    if discrim < 0.0 {
-        std::f64::NAN
-    } else {
-        let sign_bp = bp.signum();
-        let q = bp + (sign_bp * (a * discrim).sqrt());
-        let t_hit = if c > 0.0 { c / q } else { q / a };
-        if t_min <= t_hit && t_hit <= t_max {
-            t_hit
-        } else {
-            std::f64::NAN
+        // let q = bp + (sign_bp * (a * discrim).sqrt());
+        let q_rhs = _mm256_sqrt_pd(_mm256_mul_pd(a, dis));
+        let q = _mm256_blendv_pd(_mm256_add_pd(bp, q_rhs), _mm256_sub_pd(bp, q_rhs), bp);
+
+        let c_div_q = _mm256_div_pd(c, q);
+        let q_div_a = _mm256_div_pd(q, a);
+        let t_hit = _mm256_blendv_pd(c_div_q, q_div_a, c);
+        let t_hit = _mm256_blendv_pd(t_hit, _mm256_set1_pd(f64::NAN), dis);
+        _mm256_storeu_pd(dst_t_hit.as_mut_ptr(), t_hit);
+    }
+    let mut t_found = t_max;
+    let mut found: isize = -1;
+    for (i, &t_hit) in t_hits.iter().enumerate().take(xs.len()) {
+        if !t_hit.is_nan() && t_min <= t_hit && t_hit <= t_found {
+            t_found = t_hit;
+            found = i as isize
         }
     }
+    (t_found, found)
 }

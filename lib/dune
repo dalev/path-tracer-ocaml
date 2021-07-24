@@ -1,11 +1,15 @@
 (rule
- (targets libsphere_intersect.a)
+ (targets libsphere_intersect.a dllsphere_intersect.so)
  (deps
   (glob_files *.rs)
   (env_var RUSTFLAGS))
  (action
   (progn
    (run cargo build --target-dir %{project_root}/../../target --release)
+   (run
+    mv
+    %{project_root}/../../target/release/libsphere_intersect.so
+    ./dllsphere_intersect.so)
    (run
     mv
     %{project_root}/../../target/release/libsphere_intersect.a
