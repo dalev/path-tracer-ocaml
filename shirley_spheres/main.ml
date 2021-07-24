@@ -153,8 +153,9 @@ module Sphere_pack_tree = Skd_tree.Make (struct
   type t = {coords: coords; ms: Material.t array}
   type elt = Sphere.t
 
-  external spheres_intersect : coords -> float -> float -> Ray.t -> (float * int) option
-    = "spheres_intersect_bytecode" "spheres_intersect"
+  external spheres_intersect_native :
+    coords -> (float[@unboxed]) -> (float[@unboxed]) -> Ray.t -> (float * int) option
+    = "spheres_intersect_bytecode" "spheres_intersect_native"
 
   let elt_bbox = Sphere.bbox
   let hit = Sphere.hit
@@ -179,7 +180,7 @@ module Sphere_pack_tree = Skd_tree.Make (struct
     P3.create ~x ~y ~z
 
   let intersect t ray ~t_min ~t_max =
-    match spheres_intersect t.coords t_min t_max ray with
+    match spheres_intersect_native t.coords t_min t_max ray with
     | None -> None
     | Some (t_hit, idx) ->
         let center = center t idx in

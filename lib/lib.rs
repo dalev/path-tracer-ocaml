@@ -1,3 +1,6 @@
+use core::slice;
+use ocaml::Raw;
+
 #[ocaml::func]
 pub fn hello_world() -> &'static str {
     "hello, world!"
@@ -17,6 +20,16 @@ impl std::convert::From<ocaml::Array<'_, f64>> for V3 {
             let y = a.get_double_unchecked(1);
             let z = a.get_double_unchecked(2);
             V3 { x, y, z }
+        }
+    }
+}
+
+impl std::convert::From<&[f64]> for V3 {
+    fn from(s: &[f64]) -> V3 {
+        V3 {
+            x: s[0],
+            y: s[1],
+            z: s[2],
         }
     }
 }
@@ -50,65 +63,26 @@ impl V3 {
     }
 }
 
-#[derive(ocaml::FromValue)]
-struct Coords<'a> {
-    xs: ocaml::Array<'a, ocaml::Float>,
-    ys: ocaml::Array<'a, ocaml::Float>,
-    zs: ocaml::Array<'a, ocaml::Float>,
-    rs: ocaml::Array<'a, ocaml::Float>,
+unsafe fn make_slice<'a, T>(p: *const T) -> &'a [T] {
+    let len = ocaml_sys::caml_array_length(p as isize);
+    slice::from_raw_parts(p, len)
 }
 
-#[derive(ocaml::FromValue)]
-struct Ray<'a> {
-    orig: ocaml::Array<'a, ocaml::Float>,
-    dir: ocaml::Array<'a, ocaml::Float>,
-    dir_inv: ocaml::Array<'a, ocaml::Float>,
-}
-
-#[ocaml::func]
-pub fn spheres_intersect(
-    c: Coords,
-    t_min: ocaml::Float,
-    t_max: ocaml::Float,
-    ray: Ray,
-) -> Option<(ocaml::Float, ocaml::Int)> {
-    let xs = &c.xs;
-    let ys = &c.ys;
-    let zs = &c.zs;
-    let rs = &c.rs;
-    // if !xs.is_double_array() {
-    //     panic!("xs is double array")
-    // }
-    // if !ys.is_double_array() {
-    //     panic!("ys is double array")
-    // }
-    // if !zs.is_double_array() {
-    //     panic!("zs is double array")
-    // }
-    // if !rs.is_double_array() {
-    //     panic!("rs is double array")
-    // }
-    // if !ray.orig.is_double_array() {
-    //     panic!("ray_orig is double array, len = {}", ray.orig.len())
-    // }
-    // if !ray.dir.is_double_array() {
-    //     panic!("ray_dir is double array")
-    // }
-    let ray_orig = V3::from(ray.orig);
-    let ray_dir = V3::from(ray.dir);
+#[ocaml::native_func]
+pub fn spheres_intersect_native(c: Raw, t_min: f64, t_max: f64, ray: Raw) -> ocaml::Value {
+    let c = unsafe { slice::from_raw_parts(c.0 as *const *const f64, 4) };
+    let ray = unsafe { slice::from_raw_parts(ray.0 as *const *const f64, 2) };
+    let xs = unsafe { make_slice(c[0]) };
+    let ys = unsafe { make_slice(c[1]) };
+    let zs = unsafe { make_slice(c[2]) };
+    let rs = unsafe { make_slice(c[3]) };
+    let o = V3::from(unsafe { make_slice(ray[0]) });
+    let d = V3::from(unsafe { make_slice(ray[1]) });
     let mut t_max = t_max;
     let mut found: Option<usize> = None;
-    let len = xs.len();
-    for i in 0..len {
-        let c = unsafe {
-            V3 {
-                x: xs.get_double_unchecked(i),
-                y: ys.get_double_unchecked(i),
-                z: zs.get_double_unchecked(i),
-            }
-        };
-        let r = unsafe { rs.get_double_unchecked(i) };
-        match intersect(c, r, ray_orig, ray_dir, t_min, t_max) {
+    for (i, (&x, (&y, (&z, &r)))) in xs.iter().zip(ys.iter().zip(zs.iter().zip(rs))).enumerate() {
+        let c = V3 { x, y, z };
+        match intersect(c, r, o, d, t_min, t_max) {
             None => (),
             Some(t_hit) => {
                 t_max = t_hit;
@@ -117,8 +91,8 @@ pub fn spheres_intersect(
         }
     }
     match found {
-        None => None,
-        Some(i) => Some((t_max, i as isize)),
+        None => ocaml::Value::none(),
+        Some(i) => unsafe { ocaml::Value::some(gc, (t_max, i as isize)) },
     }
 }
 
