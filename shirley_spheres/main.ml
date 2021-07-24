@@ -192,7 +192,7 @@ module Spheres_leaf = struct
   let intersect t ray ~t_min ~t_max =
     let t_hit_ref = {float_contents= Float.nan} in
     let idx = spheres_intersect_native t.coords t_min t_max ray t_hit_ref in
-    if idx < 0 || idx >= Array.length t.ms then
+    if idx < 0 then
       None
     else
       let t_hit = t_hit_ref.float_contents in
