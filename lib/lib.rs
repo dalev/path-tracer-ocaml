@@ -126,11 +126,11 @@ unsafe fn spheres_intersect_aux(
         let y = _mm256_loadu_pd(y.as_ptr());
         let z = _mm256_loadu_pd(z.as_ptr());
         let r = _mm256_loadu_pd(r.as_ptr());
-        let r2 = _mm256_mul_pd(r, r);
         // f = center - origin
         let fx = _mm256_sub_pd(x, ox);
         let fy = _mm256_sub_pd(y, oy);
         let fz = _mm256_sub_pd(z, oz);
+        let r2 = _mm256_mul_pd(r, r);
         let c = _mm256_sub_pd(simd::quadrance(fx, fy, fz), r2);
         // bp = dot(f, d)
         let bp = simd::dot4(fx, fy, fz, dx, dy, dz);
@@ -149,13 +149,21 @@ unsafe fn spheres_intersect_aux(
         let c_div_q = _mm256_div_pd(c, q);
         let q_div_a = _mm256_div_pd(q, a);
         let t_hit = _mm256_blendv_pd(c_div_q, q_div_a, c);
-        let t_hit = _mm256_blendv_pd(t_hit, _mm256_set1_pd(f64::NAN), dis);
+        let outside_range = _mm256_or_pd(
+            _mm256_cmp_pd(t_hit, _mm256_set1_pd(t_min), _CMP_LT_OQ),
+            _mm256_cmp_pd(t_hit, _mm256_set1_pd(t_max), _CMP_GT_OQ),
+        );
+        let t_hit = _mm256_blendv_pd(
+            t_hit,
+            _mm256_set1_pd(f64::NAN),
+            _mm256_or_pd(dis, outside_range),
+        );
         _mm256_storeu_pd(dst_t_hit.as_mut_ptr(), t_hit);
     }
     let mut t_found = t_max;
     let mut found: isize = -1;
     for (i, &t_hit) in t_hits.iter().enumerate().take(xs.len()) {
-        if !t_hit.is_nan() && t_min <= t_hit && t_hit <= t_found {
+        if !t_hit.is_nan() && t_hit <= t_found {
             t_found = t_hit;
             found = i as isize
         }
