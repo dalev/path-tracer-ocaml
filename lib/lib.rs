@@ -1,5 +1,6 @@
 use core::slice;
 use ocaml::Raw;
+use packed_simd::*;
 
 #[ocaml::func]
 pub fn hello_world() -> &'static str {
@@ -11,17 +12,6 @@ struct V3 {
     x: f64,
     y: f64,
     z: f64,
-}
-
-impl std::convert::From<ocaml::Array<'_, f64>> for V3 {
-    fn from(a: ocaml::Array<f64>) -> V3 {
-        unsafe {
-            let x = a.get_double_unchecked(0);
-            let y = a.get_double_unchecked(1);
-            let z = a.get_double_unchecked(2);
-            V3 { x, y, z }
-        }
-    }
 }
 
 impl std::convert::From<&[f64]> for V3 {
@@ -53,14 +43,6 @@ impl V3 {
     fn quadrance(self) -> f64 {
         self.dot(self)
     }
-
-    fn scale(self, s: f64) -> V3 {
-        V3 {
-            x: self.x * s,
-            y: self.y * s,
-            z: self.z * s,
-        }
-    }
 }
 
 unsafe fn make_slice<'a, T>(p: *const T) -> &'a [T] {
@@ -84,34 +66,100 @@ pub extern "C" fn spheres_intersect_native(
     let rs = unsafe { make_slice(c[3]) };
     let o = V3::from(unsafe { make_slice(ray[0]) });
     let d = V3::from(unsafe { make_slice(ray[1]) });
+    let (t_found, found) = spheres_intersect_aux(xs, ys, zs, rs, o, d, t_min, t_max);
+    unsafe {
+        *(t_hit_ref.0 as *mut f64) = t_found;
+    }
+    unsafe { ocaml::Raw(ocaml_sys::val_int(found)) }
+}
+
+const LEAF_SIZE: usize = 32;
+
+type LeafF64s = [f64; LEAF_SIZE];
+
+fn sub_const(dst: &mut [f64], src: &[f64], rhs: f64) {
+    for (d, s) in dst.iter_mut().zip(src) {
+        *d = s - rhs
+    }
+}
+
+fn vmul_add(dst: &mut [f64], src: &[f64], scalar: f64) {
+    for (d, f) in dst.iter_mut().zip(src) {
+        *d = f.mul_add(scalar, *d)
+    }
+}
+
+fn sq(x: f64) -> f64 {
+    x * x
+}
+
+fn spheres_intersect_aux(
+    xs: &[f64],
+    ys: &[f64],
+    zs: &[f64],
+    rs: &[f64],
+    o: V3,
+    d: V3,
+    t_min: f64,
+    t_max: f64,
+) -> (f64, isize) {
+    let len = xs.len();
+    // assert_eq!(len, LEAF_SIZE);
+    let mut r2s: LeafF64s = [0.0; LEAF_SIZE];
+    let mut fxs: LeafF64s = [0.0; LEAF_SIZE];
+    let mut fys: LeafF64s = [0.0; LEAF_SIZE];
+    let mut fzs: LeafF64s = [0.0; LEAF_SIZE];
+    for (dst, src) in r2s.iter_mut().zip(rs) {
+        *dst = src * src;
+    }
+    let d_quadrance = d.quadrance();
+    sub_const(&mut fxs, &xs, o.x);
+    sub_const(&mut fys, &ys, o.y);
+    sub_const(&mut fzs, &zs, o.z);
+    let mut bps: LeafF64s = [0.0; LEAF_SIZE];
+    vmul_add(&mut bps, &fxs[0..len], d.x);
+    vmul_add(&mut bps, &fys[0..len], d.y);
+    vmul_add(&mut bps, &fzs[0..len], d.z);
+    // let discrim = r2 - (d.scale(bp / a) - f).quadrance();
+    let mut discrims = r2s;
+    for (dst, (bp, (fx, (fy, fz)))) in discrims[0..len]
+        .iter_mut()
+        .zip(bps.iter().zip(fxs.iter().zip(fys.iter().zip(fzs))))
+    {
+        let s = bp / d_quadrance; // a == d_quadrance
+        let q = sq(d.x * s - fx) + sq(d.y * s - fy) + sq(d.z * s - fz);
+        *dst -= q
+    }
     let mut t_max = t_max;
     let mut found: isize = -1;
-    for (i, (&x, (&y, (&z, &r)))) in xs.iter().zip(ys.iter().zip(zs.iter().zip(rs))).enumerate() {
-        let c = V3 { x, y, z };
-        let t_hit = intersect(c, r, o, d, t_min, t_max);
+    let mut cs = [0.0; LEAF_SIZE];
+    for (c, (&fx, (&fy, (&fz, r2)))) in cs[0..len]
+        .iter_mut()
+        .zip(fxs.iter().zip(fys.iter().zip(fzs.iter().zip(r2s))))
+    {
+        *c = sq(fx) + sq(fy) + sq(fz) - r2
+    }
+    for (i, (&c, (&bp, discrim))) in cs
+        .iter()
+        .zip(bps.iter().zip(discrims))
+        .enumerate()
+        .take(len)
+    {
+        let t_hit = intersect(discrim, d_quadrance, bp, c, t_min, t_max);
         if !f64::is_nan(t_hit) {
             t_max = t_hit;
             found = i as isize;
         }
     }
-    unsafe {
-        *(t_hit_ref.0 as *mut f64) = t_max;
-    }
-    unsafe { ocaml::Raw(ocaml_sys::val_int(found)) }
+    (t_max, found)
 }
 
-fn intersect(center: V3, radius: f64, o: V3, d: V3, t_min: f64, t_max: f64) -> f64 {
-    let r2 = radius * radius;
-    let f = center - o;
-    let bp = f.dot(d);
-    let a = d.quadrance();
-    let discrim = r2 - (d.scale(bp / a) - f).quadrance();
+fn intersect(discrim: f64, a: f64, bp: f64, c: f64, t_min: f64, t_max: f64) -> f64 {
     if discrim < 0.0 {
         std::f64::NAN
     } else {
         let sign_bp = bp.signum();
         let q = bp + (sign_bp * (a * discrim).sqrt());
-        let c = f.quadrance() - r2;
         let t_hit = if c > 0.0 { c / q } else { q / a };
         if t_min <= t_hit && t_hit <= t_max {
             t_hit

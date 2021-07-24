@@ -12,3 +12,4 @@ path = "lib/lib.rs"
 ocaml = "*"
 ocaml-interop = "*"
 ocaml-sys = "*"
+packed_simd = { version = "0.3.4", package = "packed_simd_2" }

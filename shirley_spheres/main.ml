@@ -145,7 +145,7 @@ module Sphere_array_tree = Skd_tree.Make (struct
     match !item with None -> None | Some s -> Some (!t_max, s)
 end)
 
-module Sphere_pack_tree = Skd_tree.Make (struct
+module Spheres_leaf = struct
   module FArray = Caml.Float.Array
 
   type f64array = FArray.t
@@ -161,7 +161,7 @@ module Sphere_pack_tree = Skd_tree.Make (struct
 
   let elt_bbox = Sphere.bbox
   let hit = Sphere.hit
-  let length_cutoff = 8
+  let length_cutoff = 32
 
   let of_elts elts =
     let len = Array.length elts in
@@ -192,9 +192,24 @@ module Sphere_pack_tree = Skd_tree.Make (struct
       let radius = FArray.get t.coords.rs idx in
       let sph = Sphere.create ~material:t.ms.(idx) ~center ~radius in
       Some (t_hit, sph)
-end)
+end
 
+module Sphere_pack_tree = Skd_tree.Make (Spheres_leaf)
 module Spheres = Sphere_pack_tree
+
+module Leaf_lengths = struct
+  type s = {size: int; count: int} [@@deriving sexp_of]
+  type t = s list [@@deriving sexp_of]
+
+  let create tree =
+    let h = Hashtbl.create (module Int) in
+    Spheres.iter_leaves tree ~f:(fun l ->
+        let len = Spheres_leaf.length l in
+        Hashtbl.incr h len ) ;
+    Hashtbl.to_alist h
+    |> List.map ~f:(fun (size, count) -> {size; count})
+    |> List.sort ~compare:(fun a b -> Int.compare a.size b.size)
+end
 
 let main args =
   let* () = Lwt_io.printf "%s\n" (Foreign.hello_world ()) in
@@ -212,10 +227,14 @@ let main args =
     else
       Some (fun pct -> Lwt_io.printf "\rProgress: %3.1f%%" pct) in
   let camera = camera (width // height) in
+  let tree =
+    List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
+    |> Spheres.create in
+  let* () = Lwt_io.printf "tree depth = %d\n" (Spheres.depth tree) in
+  let* () =
+    Lwt_io.printf "leaf lengths =\n%s\n"
+      (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree)) in
   let i =
-    let tree =
-      List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
-      |> Spheres.create in
     let intersect r = Spheres.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value in
     Integrator.create ~width ~height ~write_pixel ~max_bounces ~samples_per_pixel:spp
       ~intersect ~background ~camera ~diffuse_plus_light:Pdf.diffuse in
