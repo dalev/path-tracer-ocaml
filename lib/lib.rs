@@ -4,11 +4,6 @@ use ocaml::Raw;
 const LEAF_SIZE: usize = 16;
 
 #[ocaml::func]
-pub fn hello_world() -> &'static str {
-    "hello, world!"
-}
-
-#[ocaml::func]
 pub fn leaf_size() -> usize {
     LEAF_SIZE
 }
