@@ -152,10 +152,12 @@ module Sphere_pack_tree = Skd_tree.Make (struct
   type coords = {xs: f64array; ys: f64array; zs: f64array; rs: f64array}
   type t = {coords: coords; ms: Material.t array}
   type elt = Sphere.t
+  type float_ref = {mutable float_contents: float}
 
   external spheres_intersect_native :
-    coords -> (float[@unboxed]) -> (float[@unboxed]) -> Ray.t -> (float * int) option
+    coords -> (float[@unboxed]) -> (float[@unboxed]) -> Ray.t -> float_ref -> int
     = "spheres_intersect_bytecode" "spheres_intersect_native"
+    [@@noalloc]
 
   let elt_bbox = Sphere.bbox
   let hit = Sphere.hit
@@ -180,13 +182,16 @@ module Sphere_pack_tree = Skd_tree.Make (struct
     P3.create ~x ~y ~z
 
   let intersect t ray ~t_min ~t_max =
-    match spheres_intersect_native t.coords t_min t_max ray with
-    | None -> None
-    | Some (t_hit, idx) ->
-        let center = center t idx in
-        let radius = FArray.get t.coords.rs idx in
-        let sph = Sphere.create ~material:t.ms.(idx) ~center ~radius in
-        Some (t_hit, sph)
+    let t_hit_ref = {float_contents= Float.nan} in
+    let idx = spheres_intersect_native t.coords t_min t_max ray t_hit_ref in
+    if idx < 0 then
+      None
+    else
+      let t_hit = t_hit_ref.float_contents in
+      let center = center t idx in
+      let radius = FArray.get t.coords.rs idx in
+      let sph = Sphere.create ~material:t.ms.(idx) ~center ~radius in
+      Some (t_hit, sph)
 end)
 
 module Spheres = Sphere_pack_tree

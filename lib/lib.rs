@@ -68,8 +68,14 @@ unsafe fn make_slice<'a, T>(p: *const T) -> &'a [T] {
     slice::from_raw_parts(p, len)
 }
 
-#[ocaml::native_func]
-pub fn spheres_intersect_native(c: Raw, t_min: f64, t_max: f64, ray: Raw) -> ocaml::Value {
+#[no_mangle]
+pub extern "C" fn spheres_intersect_native(
+    c: Raw,
+    t_min: f64,
+    t_max: f64,
+    ray: Raw,
+    t_hit_ref: Raw,
+) -> Raw {
     let c = unsafe { slice::from_raw_parts(c.0 as *const *const f64, 4) };
     let ray = unsafe { slice::from_raw_parts(ray.0 as *const *const f64, 2) };
     let xs = unsafe { make_slice(c[0]) };
@@ -79,40 +85,38 @@ pub fn spheres_intersect_native(c: Raw, t_min: f64, t_max: f64, ray: Raw) -> oca
     let o = V3::from(unsafe { make_slice(ray[0]) });
     let d = V3::from(unsafe { make_slice(ray[1]) });
     let mut t_max = t_max;
-    let mut found: Option<usize> = None;
+    let mut found: isize = -1;
     for (i, (&x, (&y, (&z, &r)))) in xs.iter().zip(ys.iter().zip(zs.iter().zip(rs))).enumerate() {
         let c = V3 { x, y, z };
-        match intersect(c, r, o, d, t_min, t_max) {
-            None => (),
-            Some(t_hit) => {
-                t_max = t_hit;
-                found = Some(i)
-            }
+        let t_hit = intersect(c, r, o, d, t_min, t_max);
+        if !f64::is_nan(t_hit) {
+            t_max = t_hit;
+            found = i as isize;
         }
     }
-    match found {
-        None => ocaml::Value::none(),
-        Some(i) => unsafe { ocaml::Value::some(gc, (t_max, i as isize)) },
+    unsafe {
+        *(t_hit_ref.0 as *mut f64) = t_max;
     }
+    unsafe { ocaml::Raw(ocaml_sys::val_int(found)) }
 }
 
-fn intersect(center: V3, radius: f64, o: V3, d: V3, t_min: f64, t_max: f64) -> Option<f64> {
+fn intersect(center: V3, radius: f64, o: V3, d: V3, t_min: f64, t_max: f64) -> f64 {
     let r2 = radius * radius;
     let f = center - o;
     let bp = f.dot(d);
     let a = d.quadrance();
     let discrim = r2 - (d.scale(bp / a) - f).quadrance();
     if discrim < 0.0 {
-        None
+        std::f64::NAN
     } else {
         let sign_bp = bp.signum();
         let q = bp + (sign_bp * (a * discrim).sqrt());
         let c = f.quadrance() - r2;
         let t_hit = if c > 0.0 { c / q } else { q / a };
         if t_min <= t_hit && t_hit <= t_max {
-            Some(t_hit)
+            t_hit
         } else {
-            None
+            std::f64::NAN
         }
     }
 }
