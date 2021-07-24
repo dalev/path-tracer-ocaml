@@ -25,17 +25,6 @@ impl std::convert::From<&[f64]> for V3 {
     }
 }
 
-impl std::ops::Sub for V3 {
-    type Output = Self;
-    fn sub(self, src: V3) -> Self::Output {
-        V3 {
-            x: self.x - src.x,
-            y: self.y - src.y,
-            z: self.z - src.z,
-        }
-    }
-}
-
 impl V3 {
     fn dot(self, other: V3) -> f64 {
         self.x * other.x + self.y * other.y + self.z * other.z
@@ -78,6 +67,7 @@ mod simd {
     #[cfg(target_arch = "x86_64")]
     use core::arch::x86_64::*;
 
+    #[inline(always)]
     pub unsafe fn dot4(
         vx: __m256d,
         vy: __m256d,
@@ -89,6 +79,7 @@ mod simd {
         _mm256_fmadd_pd(vx, wx, _mm256_fmadd_pd(vy, wy, _mm256_mul_pd(vz, wz)))
     }
 
+    #[inline(always)]
     pub unsafe fn quadrance(vx: __m256d, vy: __m256d, vz: __m256d) -> __m256d {
         dot4(vx, vy, vz, vx, vy, vz)
     }
@@ -163,7 +154,7 @@ unsafe fn spheres_intersect_aux(
     let mut t_found = t_max;
     let mut found: isize = -1;
     for (i, &t_hit) in t_hits.iter().enumerate().take(xs.len()) {
-        if !t_hit.is_nan() && t_hit <= t_found {
+        if t_hit <= t_found {
             t_found = t_hit;
             found = i as isize
         }
