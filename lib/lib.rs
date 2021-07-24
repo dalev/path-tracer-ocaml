@@ -1,6 +1,3 @@
-use ocaml::{FromValue, IntoValue};
-use std::convert::TryInto;
-
 #[ocaml::func]
 pub fn hello_world() -> &'static str {
     "hello, world!"
@@ -15,10 +12,12 @@ struct V3 {
 
 impl std::convert::From<ocaml::Array<'_, f64>> for V3 {
     fn from(a: ocaml::Array<f64>) -> V3 {
-        let x = a.get_double(0).expect("x");
-        let y = a.get_double(1).expect("y");
-        let z = a.get_double(2).expect("z");
-        V3 { x, y, z }
+        unsafe {
+            let x = a.get_double_unchecked(0);
+            let y = a.get_double_unchecked(1);
+            let z = a.get_double_unchecked(2);
+            V3 { x, y, z }
+        }
     }
 }
 
@@ -73,51 +72,43 @@ pub fn spheres_intersect(
     t_max: ocaml::Float,
     ray: Ray,
 ) -> Option<(ocaml::Float, ocaml::Int)> {
-    // println!("spheres_intersect: start");
     let xs = &c.xs;
     let ys = &c.ys;
     let zs = &c.zs;
     let rs = &c.rs;
-    if !xs.is_double_array() {
-        panic!("xs is double array")
-    }
-    // println!("spheres_intersect: xs.len() = {}", xs.len());
-    if !ys.is_double_array() {
-        panic!("ys is double array")
-    }
-    if !zs.is_double_array() {
-        panic!("zs is double array")
-    }
-    if !rs.is_double_array() {
-        panic!("rs is double array")
-    }
-    if !ray.orig.is_double_array() {
-        panic!("ray_orig is double array, len = {}", ray.orig.len())
-    }
-    if !ray.dir.is_double_array() {
-        panic!("ray_dir is double array")
-    }
-    // println!("spheres_intersect: is_double_array checks finished");
+    // if !xs.is_double_array() {
+    //     panic!("xs is double array")
+    // }
+    // if !ys.is_double_array() {
+    //     panic!("ys is double array")
+    // }
+    // if !zs.is_double_array() {
+    //     panic!("zs is double array")
+    // }
+    // if !rs.is_double_array() {
+    //     panic!("rs is double array")
+    // }
+    // if !ray.orig.is_double_array() {
+    //     panic!("ray_orig is double array, len = {}", ray.orig.len())
+    // }
+    // if !ray.dir.is_double_array() {
+    //     panic!("ray_dir is double array")
+    // }
     let ray_orig = V3::from(ray.orig);
     let ray_dir = V3::from(ray.dir);
     let mut t_max = t_max;
     let mut found: Option<usize> = None;
     let len = xs.len();
     for i in 0..len {
-        // println!("spheres_intersect: i = {}", i);
-        let c = V3 {
-            x: xs.get_double(i).expect("xs"),
-            y: ys.get_double(i).expect("ys"),
-            z: zs.get_double(i).expect("zs"),
+        let c = unsafe {
+            V3 {
+                x: xs.get_double_unchecked(i),
+                y: ys.get_double_unchecked(i),
+                z: zs.get_double_unchecked(i),
+            }
         };
-        match intersect(
-            c,
-            rs.get_double(i).expect("rs"),
-            ray_orig,
-            ray_dir,
-            t_min,
-            t_max,
-        ) {
+        let r = unsafe { rs.get_double_unchecked(i) };
+        match intersect(c, r, ray_orig, ray_dir, t_min, t_max) {
             None => (),
             Some(t_hit) => {
                 t_max = t_hit;
@@ -127,12 +118,11 @@ pub fn spheres_intersect(
     }
     match found {
         None => None,
-        Some(i) => Some((t_max, i.try_into().expect("i to isize"))),
+        Some(i) => Some((t_max, i as isize)),
     }
 }
 
 fn intersect(center: V3, radius: f64, o: V3, d: V3, t_min: f64, t_max: f64) -> Option<f64> {
-    // println!("intersect: start");
     let r2 = radius * radius;
     let f = center - o;
     let bp = f.dot(d);
