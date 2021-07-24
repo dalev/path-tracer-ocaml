@@ -3,7 +3,9 @@ open! Base
 type t
 
 val create : material:Material.t -> center:P3.t -> radius:float -> t
+val center : t -> P3.t
 val material : t -> Material.t
+val radius : t -> float
 val transform : t -> f:(P3.t -> Affine.p3) -> t
 val bbox : t -> Bbox.t
 val normal : t -> P3.t -> V3.t

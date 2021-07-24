@@ -4,6 +4,8 @@ type t = {material: Material.t; center: P3.t; radius: float}
 
 let create ~material ~center ~radius = {material; center; radius}
 let material t = t.material
+let center t = t.center
+let radius t = t.radius
 let transform t ~f = {t with center= f t.center}
 
 let bbox {center; radius; _} =

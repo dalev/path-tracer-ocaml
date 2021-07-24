@@ -120,7 +120,7 @@ let background =
     let t = 0.5 *. (V3.dot d V3.unit_y +. 1.0) in
     Color.lerp t Color.white escape_color
 
-module Sphere_tree = Skd_tree.Make (struct
+module Sphere_array_tree = Skd_tree.Make (struct
   type t = Sphere.t array
   type elt = Sphere.t
 
@@ -145,6 +145,51 @@ module Sphere_tree = Skd_tree.Make (struct
     match !item with None -> None | Some s -> Some (!t_max, s)
 end)
 
+module Sphere_pack_tree = Skd_tree.Make (struct
+  module FArray = Caml.Float.Array
+
+  type f64array = FArray.t
+  type coords = {xs: f64array; ys: f64array; zs: f64array; rs: f64array}
+  type t = {coords: coords; ms: Material.t array}
+  type elt = Sphere.t
+
+  external spheres_intersect : coords -> float -> float -> Ray.t -> (float * int) option
+    = "spheres_intersect_bytecode" "spheres_intersect"
+
+  let elt_bbox = Sphere.bbox
+  let hit = Sphere.hit
+  let length_cutoff = 8
+
+  let of_elts elts =
+    let len = Array.length elts in
+    let farray axis = FArray.init len (fun i -> axis @@ Sphere.center elts.(i)) in
+    let xs = farray P3.x in
+    let ys = farray P3.y in
+    let zs = farray P3.z in
+    let rs = FArray.init len (fun i -> Sphere.radius elts.(i)) in
+    let ms = Array.map elts ~f:Sphere.material in
+    {coords= {xs; ys; zs; rs}; ms}
+
+  let depth _ = 0
+  let length t = Array.length t.ms
+
+  let center t idx =
+    let c = t.coords in
+    let x = FArray.get c.xs idx and y = FArray.get c.ys idx and z = FArray.get c.zs idx in
+    P3.create ~x ~y ~z
+
+  let intersect t ray ~t_min ~t_max =
+    match spheres_intersect t.coords t_min t_max ray with
+    | None -> None
+    | Some (t_hit, idx) ->
+        let center = center t idx in
+        let radius = FArray.get t.coords.rs idx in
+        let sph = Sphere.create ~material:t.ms.(idx) ~center ~radius in
+        Some (t_hit, sph)
+end)
+
+module Spheres = Sphere_pack_tree
+
 let main args =
   let* () = Lwt_io.printf "%s\n" (Foreign.hello_world ()) in
   let {Args.width; height; spp; output; no_progress; max_bounces} = args in
@@ -164,9 +209,8 @@ let main args =
   let i =
     let tree =
       List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
-      |> Sphere_tree.create in
-    let intersect r =
-      Sphere_tree.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value in
+      |> Spheres.create in
+    let intersect r = Spheres.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value in
     Integrator.create ~width ~height ~write_pixel ~max_bounces ~samples_per_pixel:spp
       ~intersect ~background ~camera ~diffuse_plus_light:Pdf.diffuse in
   let* () = Integrator.render ?update_progress i in

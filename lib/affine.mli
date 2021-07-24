@@ -47,6 +47,9 @@ module P3 : sig
   val create : x:float -> y:float -> z:float -> t
   val coords : t -> float * float * float
   val axis : Axis.t -> t -> float
+  val x : t -> float
+  val y : t -> float
+  val z : t -> float
   val origin : t
   val translate : t -> V3.t -> t
   val to_v3 : t -> V3.t

@@ -1,8 +1,8 @@
 (env
  (dev
-  (flags -w +a-4-33-34-40-41-42-43-44-48 -warn-error +A))
+  (flags -w +a-4-33-34-40-41-42-43-44-48-60 -warn-error +A))
  (release
-  (flags -w +a-4-33-34-40-41-42-43-44-48 -warn-error +A)
+  (flags -w +a-4-33-34-40-41-42-43-44-48-60 -warn-error +A)
   (ocamlopt_flags
    (:standard
     ; -dump-into-file -dcmm

@@ -10,3 +10,5 @@ path = "lib/lib.rs"
 
 [dependencies]
 ocaml = "*"
+ocaml-interop = "*"
+ocaml-sys = "*"
