@@ -159,9 +159,11 @@ module Spheres_leaf = struct
     = "spheres_intersect_bytecode" "spheres_intersect_native"
     [@@noalloc]
 
+  external leaf_size : unit -> int = "leaf_size"
+
   let elt_bbox = Sphere.bbox
   let hit = Sphere.hit
-  let length_cutoff = 32
+  let length_cutoff = leaf_size ()
 
   let of_elts elts =
     let elts_len = Array.length elts in

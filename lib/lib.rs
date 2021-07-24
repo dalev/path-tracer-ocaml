@@ -1,9 +1,16 @@
 use core::slice;
 use ocaml::Raw;
 
+const LEAF_SIZE: usize = 16;
+
 #[ocaml::func]
 pub fn hello_world() -> &'static str {
     "hello, world!"
+}
+
+#[ocaml::func]
+pub fn leaf_size() -> usize {
+    LEAF_SIZE
 }
 
 #[derive(Clone, Copy)]
@@ -71,8 +78,6 @@ pub extern "C" fn spheres_intersect_native(
     }
     unsafe { ocaml::Raw(ocaml_sys::val_int(found)) }
 }
-
-const LEAF_SIZE: usize = 32;
 
 mod simd {
     #[cfg(target_arch = "x86_64")]
