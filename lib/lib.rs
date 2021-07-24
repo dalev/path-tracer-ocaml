@@ -1,6 +1,5 @@
 use core::slice;
 use ocaml::Raw;
-use packed_simd::*;
 
 #[ocaml::func]
 pub fn hello_world() -> &'static str {

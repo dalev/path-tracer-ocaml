@@ -5,11 +5,10 @@ authors = ["Dale Vaillancourt <dalev@alum.wpi.edu>"]
 edition = "2018"
 
 [lib]
-crate-type = ["staticlib", "cdylib"]
+crate-type = ["staticlib"]
 path = "lib/lib.rs"
 
 [dependencies]
 ocaml = "*"
 ocaml-interop = "*"
 ocaml-sys = "*"
-packed_simd = { version = "0.3.4", package = "packed_simd_2" }
