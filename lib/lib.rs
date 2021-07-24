@@ -48,19 +48,19 @@ pub extern "C" fn spheres_intersect_native(
     ray: Raw,
     t_hit_ref: Raw,
 ) -> Raw {
-    let c = unsafe { slice::from_raw_parts(c.0 as *const *const f64, 4) };
-    let ray = unsafe { slice::from_raw_parts(ray.0 as *const *const f64, 2) };
-    let xs = unsafe { make_slice(c[0]) };
-    let ys = unsafe { make_slice(c[1]) };
-    let zs = unsafe { make_slice(c[2]) };
-    let rs = unsafe { make_slice(c[3]) };
-    let o = V3::from(unsafe { make_slice(ray[0]) });
-    let d = V3::from(unsafe { make_slice(ray[1]) });
-    let (t_found, found) = unsafe { spheres_intersect_aux(xs, ys, zs, rs, o, d, t_min, t_max) };
     unsafe {
+        let c = slice::from_raw_parts(c.0 as *const *const f64, 4);
+        let ray = slice::from_raw_parts(ray.0 as *const *const f64, 2);
+        let xs = make_slice(c[0]);
+        let ys = make_slice(c[1]);
+        let zs = make_slice(c[2]);
+        let rs = make_slice(c[3]);
+        let o = V3::from(make_slice(ray[0]));
+        let d = V3::from(make_slice(ray[1]));
+        let (t_found, found) = spheres_intersect_aux(xs, ys, zs, rs, o, d, t_min, t_max);
         *(t_hit_ref.0 as *mut f64) = t_found;
+        ocaml::Raw(ocaml_sys::val_int(found))
     }
-    unsafe { ocaml::Raw(ocaml_sys::val_int(found)) }
 }
 
 mod simd {
