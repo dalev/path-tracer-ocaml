@@ -212,10 +212,6 @@ module Simd_leaf = struct
       Some (t_hit, sph)
 end
 
-(* module Spheres_leaf = Array_leaf *)
-module Spheres_leaf = Simd_leaf
-module Spheres = Skd_tree.Make (Spheres_leaf)
-
 module type Spheres_S = Skd_tree.S with type leaf_elt := Sphere.t
 
 let main args =
