@@ -9,14 +9,20 @@ let get t index = t.base.(base_index t index)
 let to_array_map t ~f = Array.init t.length ~f:(fun i -> f (get t i))
 let to_array t = to_array_map t ~f:Fn.id
 
-let fold t ~init ~f =
+let fold_from t ~init ~f ~offset =
   let rec loop acc i = if i < t.length then loop (f acc (get t i)) (i + 1) else acc in
-  loop init 0
+  loop init offset
+
+let fold = fold_from ~offset:0
 
 let iter t ~f =
   for i = t.offset to t.offset + t.length - 1 do
     f t.base.(i)
   done
+
+let map_reduce t ~transform ~combine =
+  let init = transform (get t 0) in
+  fold_from t ~init ~offset:1 ~f:(fun acc item -> combine acc (transform item))
 
 let split_at t i =
   assert (i < t.length) ;

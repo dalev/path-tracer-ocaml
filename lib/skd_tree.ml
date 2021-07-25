@@ -51,9 +51,12 @@ module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
       Slice.fold bshapes ~init ~f:(fun acc b -> Bbox.union acc (cbox b))
   end
 
-  type t =
+  type tree =
     | Leaf of L.t
-    | Branch of {to_axis: V3.t -> float; lhs_clip: float; rhs_clip: float; lhs: t; rhs: t}
+    | Branch of
+        {to_axis: V3.t -> float; lhs_clip: float; rhs_clip: float; lhs: tree; rhs: tree}
+
+  type t = {tree: tree; bbox: Bbox.t}
 
   let rec tree_cata t ~branch ~leaf =
     match t with
@@ -61,13 +64,14 @@ module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
     | Branch {lhs; rhs; _} ->
         branch (tree_cata lhs ~branch ~leaf) (tree_cata rhs ~branch ~leaf)
 
-  let length = tree_cata ~branch:( + ) ~leaf:L.length
-  let depth = tree_cata ~branch:(fun l r -> 1 + max l r) ~leaf:L.depth
+  let cata t ~branch ~leaf = tree_cata t.tree ~branch ~leaf
+  let length = cata ~branch:( + ) ~leaf:L.length
+  let depth = cata ~branch:(fun l r -> 1 + max l r) ~leaf:L.depth
 
-  let rec iter_leaves t ~f =
-    match t with
-    | Leaf l -> f l
-    | Branch {lhs; rhs; _} -> iter_leaves lhs ~f ; iter_leaves rhs ~f
+  let iter_leaves t ~f =
+    let rec loop t =
+      match t with Leaf l -> f l | Branch {lhs; rhs; _} -> loop lhs ; loop rhs in
+    loop t.tree
 
   let leaf_length_histogram t =
     let h = Hashtbl.create (module Int) in
@@ -76,7 +80,7 @@ module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
         Hashtbl.incr h len ) ;
     h
 
-  let intersect t ray ~t_min:t_enter ~t_max:t_leave =
+  let intersect_tree t ray ~t_enter ~t_leave =
     let d_inv = Ray.direction_inv ray in
     let o = P3.to_v3 (Ray.origin ray) in
     let open Float.O in
@@ -112,6 +116,11 @@ module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
     let k0 t_hit found =
       match found with None -> None | Some item -> Some (L.hit item t_hit ray) in
     loop t None t_leave t_enter t_leave k0
+
+  let intersect t ray ~t_min ~t_max =
+    let t_enter, t_leave = Bbox.hit_range t.bbox ray ~t_min ~t_max in
+    (* if t_enter > t_leave, then [intersect_tree] will return immediately *)
+    intersect_tree t.tree ray ~t_enter ~t_leave
 
   (* == Tree builder using Binned SAH == *)
 
@@ -195,7 +204,7 @@ module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
 
   let make_leaf shapes = Leaf (L.of_elts (Slice.to_array_map shapes ~f:Bshape.shape))
 
-  let rec create' shapes =
+  let rec create_tree shapes =
     if Slice.length shapes <= L.length_cutoff then
       make_leaf shapes
     else
@@ -209,18 +218,27 @@ module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
             let axis = Proposal.axis p in
             let to_axis = P3.axis axis in
             let lhs_clip =
-              Slice.fold l ~init:Float.neg_infinity ~f:(fun acc b ->
-                  Float.max acc (to_axis (Bbox.max (Bshape.bbox b))) ) in
+              Slice.map_reduce l
+                ~transform:(fun s -> to_axis (Bbox.max (Bshape.bbox s)))
+                ~combine:Float.max in
             let rhs_clip =
-              Slice.fold r ~init:Float.infinity ~f:(fun acc b ->
-                  Float.min acc (to_axis (Bbox.min (Bshape.bbox b))) ) in
+              Slice.map_reduce r
+                ~transform:(fun s -> to_axis (Bbox.min (Bshape.bbox s)))
+                ~combine:Float.min in
             Branch
-              {lhs= create' l; rhs= create' r; lhs_clip; rhs_clip; to_axis= V3.axis axis}
+              { lhs= create_tree l
+              ; rhs= create_tree r
+              ; lhs_clip
+              ; rhs_clip
+              ; to_axis= V3.axis axis }
           else
             make_leaf shapes
 
   let create elts =
     if List.is_empty elts then failwith "Skd_tree.create: given empty list of shapes" ;
-    Sequence.of_list elts |> Sequence.map ~f:Bshape.create |> Sequence.to_array
-    |> Slice.create |> create'
+    let elts =
+      Sequence.of_list elts |> Sequence.map ~f:Bshape.create |> Sequence.to_array
+      |> Slice.create in
+    let bbox = Slice.map_reduce elts ~transform:Bshape.bbox ~combine:Bbox.union in
+    {tree= create_tree elts; bbox}
 end

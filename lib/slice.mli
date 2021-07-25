@@ -6,6 +6,7 @@ val base_index : 'a t -> int -> int
 val get : 'a t -> int -> 'a
 val fold : 'a t -> init:'b -> f:('b -> 'a -> 'b) -> 'b
 val iter : 'a t -> f:('a -> unit) -> unit
+val map_reduce : 'a t -> transform:('a -> 'b) -> combine:('b -> 'b -> 'b) -> 'b
 val split_at : 'a t -> int -> 'a t * 'a t
 val partition_in_place : 'a t -> on_lhs:('a -> bool) -> 'a t * 'a t
 val to_array : 'a t -> 'a array

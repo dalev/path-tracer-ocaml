@@ -28,7 +28,7 @@ let surface_area {min; max} =
   let v' = V3.yzx v in
   2.0 *. V3.dot v v'
 
-let is_hit t ray ~t_min ~t_max =
+let hit_range t ray ~t_min ~t_max =
   let invd = Ray.direction_inv ray in
   let o = Ray.origin ray in
   let f p = V3.Infix.( * ) (P3.to_v3 P3.Infix.(p - o)) invd in
@@ -38,4 +38,8 @@ let is_hit t ray ~t_min ~t_max =
   let t1 = V3.map2 ~f:Float.max t0' t1' in
   let t_min = Float.max t_min (V3.max_coord t0) in
   let t_max = Float.min t_max (V3.min_coord t1) in
-  Float.( <= ) t_min t_max
+  (t_min, t_max)
+
+let is_hit t ray ~t_min ~t_max =
+  let a, b = hit_range t ray ~t_min ~t_max in
+  Float.( <= ) a b

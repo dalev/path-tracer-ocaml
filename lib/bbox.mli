@@ -9,3 +9,4 @@ val union : t -> t -> t
 val union_opt : t option -> t option -> t option
 val longest_axis : t -> Axis.t
 val surface_area : t -> float
+val hit_range : t -> Ray.t -> t_min:float -> t_max:float -> float * float
