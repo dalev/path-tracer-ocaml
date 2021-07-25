@@ -8,7 +8,7 @@ end
 
 include Skd_tree_intf
 
-module Make (L : Leaf) : Skd_tree_intf.S with type elt := L.elt = struct
+module Make (L : Leaf) : S with type elt := L.elt = struct
   module Bshape = struct
     type t = {shape: L.elt; bbox: Bbox.t; centroid: P3.t}
 
