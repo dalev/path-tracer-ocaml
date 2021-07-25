@@ -1,19 +1,22 @@
 (rule
  (targets libsphere_intersect.a dllsphere_intersect.so)
  (deps
-  (glob_files *.rs)
-  (env_var RUSTFLAGS))
+  (env_var RUSTFLAGS)
+  %{project_root}/sphere-intersect-rs/Cargo.toml
+  %{project_root}/sphere-intersect-rs/Cargo.lock
+  (source_tree %{project_root}/sphere-intersect-rs/src))
  (action
-  (progn
-   (run cargo build --target-dir %{project_root}/../../target --release)
-   (run
-    mv
-    %{project_root}/../../target/release/libsphere_intersect.so
-    ./dllsphere_intersect.so)
-   (run
-    mv
-    %{project_root}/../../target/release/libsphere_intersect.a
-    libsphere_intersect.a))))
+  (no-infer
+   (progn
+    (chdir
+     %{project_root}/sphere-intersect-rs
+     (run cargo build --release))
+    (copy
+     %{project_root}/sphere-intersect-rs/target/release/libsphere_intersect.a
+     libsphere_intersect.a)
+    (copy
+     %{project_root}/sphere-intersect-rs/target/release/libsphere_intersect.so
+     dllsphere_intersect.so)))))
 
 (library
  (name path_tracer)

@@ -6,7 +6,6 @@ edition = "2018"
 
 [lib]
 crate-type = ["staticlib", "cdylib"]
-path = "lib/lib.rs"
 
 [dependencies]
 ocaml = "*"

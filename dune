@@ -1,3 +1,5 @@
+(data_only_dirs sphere-intersect-rs)
+
 (env
  (dev
   (flags -w +a-4-33-34-40-41-42-43-44-48-60 -warn-error +A))
