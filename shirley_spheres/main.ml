@@ -2,7 +2,6 @@ open! Base
 open Lwt.Syntax
 open Path_tracer
 module Image = Bimage.Image
-(* module Pixel = Bimage.Pixel *)
 
 module Args = struct
   type t =

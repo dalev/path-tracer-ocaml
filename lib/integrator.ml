@@ -47,7 +47,6 @@ let path_tracer ~intersect ~background ~diffuse_plus_light ~camera =
             (add_mul emit attenuation emit0)
             Color.Infix.(attenuation * attn0)
         | Diffuse attenuation ->
-          let open Color.Infix in
           let ss = Hit.shader_space h in
           let dir = Pdf.sample diffuse_plus_light ss u v in
           let diffuse_pd = Pdf.eval Pdf.diffuse dir ss in
