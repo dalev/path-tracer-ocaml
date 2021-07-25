@@ -49,8 +49,10 @@ pub extern "C" fn spheres_intersect_native(
     t_hit_ref: Raw,
 ) -> Raw {
     unsafe {
-        let c = slice::from_raw_parts(c.0 as *const *const f64, 4);
-        let ray = slice::from_raw_parts(ray.0 as *const *const f64, 2);
+        let c = make_slice(c.0 as *const *const f64);
+        let ray = make_slice(ray.0 as *const *const f64);
+        assert_eq!(c.len(), 4);
+        assert_eq!(ray.len(), 3);
         let xs = make_slice(c[0]);
         let ys = make_slice(c[1]);
         let zs = make_slice(c[2]);
@@ -125,20 +127,21 @@ unsafe fn spheres_intersect_aux(
         let c = _mm256_sub_pd(simd::quadrance(fx, fy, fz), r2);
         // bp = dot(f, d)
         let bp = simd::dot4(fx, fy, fz, dx, dy, dz);
-        let bp_over_a = _mm256_div_pd(bp, a);
+        let one_over_a = _mm256_div_pd(_mm256_set1_pd(1.0), a);
+        let bp_over_a = _mm256_mul_pd(bp, one_over_a);
         // let w = d.scale(bp / a) - f
         let wx = _mm256_fmsub_pd(dx, bp_over_a, fx);
         let wy = _mm256_fmsub_pd(dy, bp_over_a, fy);
         let wz = _mm256_fmsub_pd(dz, bp_over_a, fz);
         let wq = simd::quadrance(wx, wy, wz);
-        let dis = _mm256_sub_pd(r2, wq);
+        let discriminant = _mm256_sub_pd(r2, wq);
 
         // let q = bp + (sign_bp * (a * discrim).sqrt());
-        let q_rhs = _mm256_sqrt_pd(_mm256_mul_pd(a, dis));
+        let q_rhs = _mm256_sqrt_pd(_mm256_mul_pd(a, discriminant));
         let q = _mm256_blendv_pd(_mm256_add_pd(bp, q_rhs), _mm256_sub_pd(bp, q_rhs), bp);
 
         let c_div_q = _mm256_div_pd(c, q);
-        let q_div_a = _mm256_div_pd(q, a);
+        let q_div_a = _mm256_mul_pd(q, one_over_a);
         let t_hit = _mm256_blendv_pd(c_div_q, q_div_a, c);
         let outside_range = _mm256_or_pd(
             _mm256_cmp_pd(t_hit, _mm256_set1_pd(t_min), _CMP_LT_OQ),
@@ -147,7 +150,7 @@ unsafe fn spheres_intersect_aux(
         let t_hit = _mm256_blendv_pd(
             t_hit,
             _mm256_set1_pd(f64::NAN),
-            _mm256_or_pd(dis, outside_range),
+            _mm256_or_pd(discriminant, outside_range),
         );
         _mm256_storeu_pd(dst_t_hit.as_mut_ptr(), t_hit);
     }
