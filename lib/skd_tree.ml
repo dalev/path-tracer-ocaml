@@ -21,7 +21,6 @@ end
 
 module type S = sig
   type t
-  type leaf
   type leaf_elt
 
   val create : leaf_elt list -> t
@@ -30,10 +29,10 @@ module type S = sig
 
   (* CR dalev: store top-level bbox to compute initial t-bounds *)
   val intersect : t -> Ray.t -> t_min:float -> t_max:float -> Hit.t option
-  val iter_leaves : t -> f:(leaf -> unit) -> unit
+  val leaf_length_histogram : t -> (int, int) Hashtbl.t
 end
 
-module Make (L : Leaf) : S with type leaf := L.t and type leaf_elt := L.elt = struct
+module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
   module Bshape = struct
     type t = {shape: L.elt; bbox: Bbox.t; centroid: P3.t}
 
@@ -69,6 +68,13 @@ module Make (L : Leaf) : S with type leaf := L.t and type leaf_elt := L.elt = st
     match t with
     | Leaf l -> f l
     | Branch {lhs; rhs; _} -> iter_leaves lhs ~f ; iter_leaves rhs ~f
+
+  let leaf_length_histogram t =
+    let h = Hashtbl.create (module Int) in
+    iter_leaves t ~f:(fun l ->
+        let len = L.length l in
+        Hashtbl.incr h len ) ;
+    h
 
   let intersect t ray ~t_min:t_enter ~t_max:t_leave =
     let d_inv = Ray.direction_inv ray in

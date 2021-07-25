@@ -1,7 +1,7 @@
 (rule
  (targets libsphere_intersect.a dllsphere_intersect.so)
  (deps
-  ; we explicitly set RUSTFLAGS below, so I think it's correct not to explicitly depend on it here.
+  ; we explicitly set RUSTFLAGS below, so I think it's correct not to depend on it here.
   ; (env_var RUSTFLAGS)
   %{project_root}/sphere-intersect-rs/Cargo.toml
   %{project_root}/sphere-intersect-rs/Cargo.lock

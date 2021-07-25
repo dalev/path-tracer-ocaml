@@ -11,6 +11,7 @@ module Args = struct
     ; spp: int
     ; output: string
     ; no_progress: bool
+    ; no_simd: bool
     ; max_bounces: int }
 
   let parse () =
@@ -19,6 +20,7 @@ module Args = struct
     let spp = ref 1 in
     let file = ref "output.png" in
     let no_progress = ref false in
+    let no_simd = ref false in
     let max_bounces = ref 4 in
     let usage_msg =
       Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width !height !file
@@ -28,6 +30,7 @@ module Args = struct
       ; ("-height", Set_int height, "<integer> image height")
       ; ("-samples-per-pixel", Set_int spp, "<integer> samples-per-pixel")
       ; ("-o", Set_string file, "<file> output file")
+      ; ("-no-simd", Set no_simd, "do not use SIMD accelerated intersection")
       ; ("-no-progress", Set no_progress, "suppress progress monitor")
       ; ("-max-bounces", Set_int max_bounces, "<integer> max ray bounces") ]
       (fun (_ : string) -> failwith "No anonymous arguments expected")
@@ -37,6 +40,7 @@ module Args = struct
     ; spp= !spp
     ; output= !file
     ; no_progress= !no_progress
+    ; no_simd= !no_simd
     ; max_bounces= !max_bounces }
 end
 
@@ -120,7 +124,7 @@ let background =
     let t = 0.5 *. (V3.dot d V3.unit_y +. 1.0) in
     Color.lerp t Color.white escape_color
 
-module Sphere_array_tree = Skd_tree.Make (struct
+module Array_leaf = struct
   type t = Sphere.t array
   type elt = Sphere.t
 
@@ -143,9 +147,9 @@ module Sphere_array_tree = Skd_tree.Make (struct
           t_max := t_hit
     done ;
     match !item with None -> None | Some s -> Some (!t_max, s)
-end)
+end
 
-module Spheres_leaf = struct
+module Simd_leaf = struct
   module FArray = Caml.Float.Array
 
   type f64array = FArray.t
@@ -208,25 +212,30 @@ module Spheres_leaf = struct
       Some (t_hit, sph)
 end
 
-module Sphere_pack_tree = Skd_tree.Make (Spheres_leaf)
-module Spheres = Sphere_pack_tree
+(* module Spheres_leaf = Array_leaf *)
+module Spheres_leaf = Simd_leaf
+module Spheres = Skd_tree.Make (Spheres_leaf)
 
-module Leaf_lengths = struct
-  type s = {size: int; count: int} [@@deriving sexp_of]
-  type t = s list [@@deriving sexp_of]
-
-  let create tree =
-    let h = Hashtbl.create (module Int) in
-    Spheres.iter_leaves tree ~f:(fun l ->
-        let len = Spheres_leaf.length l in
-        Hashtbl.incr h len ) ;
-    Hashtbl.to_alist h
-    |> List.map ~f:(fun (size, count) -> {size; count})
-    |> List.sort ~compare:(fun a b -> Int.compare a.size b.size)
-end
+module type Spheres_S = Skd_tree.S with type leaf_elt := Sphere.t
 
 let main args =
-  let {Args.width; height; spp; output; no_progress; max_bounces} = args in
+  let {Args.width; height; spp; output; no_progress; max_bounces; no_simd} = args in
+  let spheres_mod =
+    if no_simd then
+      (module Skd_tree.Make (Array_leaf) : Spheres_S)
+    else
+      (module Skd_tree.Make (Simd_leaf) : Spheres_S) in
+  let module Spheres = (val spheres_mod : Spheres_S) in
+  let module Leaf_lengths = struct
+    type s = {size: int; count: int} [@@deriving sexp_of]
+    type t = s list [@@deriving sexp_of]
+
+    let create tree =
+      Spheres.leaf_length_histogram tree
+      |> Hashtbl.to_alist
+      |> List.map ~f:(fun (size, count) -> {size; count})
+      |> List.sort ~compare:(fun a b -> Int.compare a.size b.size)
+  end in
   let img = mkImage width height in
   let write_pixel ~x ~y color =
     let r, g, b = Color.to_rgb color in
