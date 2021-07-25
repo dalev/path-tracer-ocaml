@@ -5,6 +5,10 @@
 (package
  (name path_tracer)
  (depends
+  (base
+   (>= 0.14.1))
+  (lwt
+   (>= 5.4.1))
   (ocaml
    (>= 4.12))))
 

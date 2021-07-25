@@ -25,6 +25,4 @@
 (library
  (name path_tracer)
  (libraries base lwt lwt.unix low_discrepancy_sequence)
- (foreign_archives sphere_intersect)
- (c_library_flags
-  (-lpthread -lc -lm)))
+ (foreign_archives sphere_intersect))
