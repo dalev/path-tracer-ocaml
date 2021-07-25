@@ -6,33 +6,9 @@ module Array = struct
   let split_at a n = partitioni_tf a ~f:(fun i _ -> i < n)
 end
 
-module type Leaf = sig
-  type t
-  type elt
+include Skd_tree_intf
 
-  val length_cutoff : int
-  val of_elts : elt array -> t
-  val elt_bbox : elt -> Bbox.t
-  val hit : elt -> float -> Ray.t -> Hit.t
-  val intersect : t -> Ray.t -> t_min:float -> t_max:float -> (float * elt) option
-  val length : t -> int
-  val depth : t -> int
-end
-
-module type S = sig
-  type t
-  type leaf_elt
-
-  val create : leaf_elt list -> t
-  val depth : t -> int
-  val length : t -> int
-
-  (* CR dalev: store top-level bbox to compute initial t-bounds *)
-  val intersect : t -> Ray.t -> t_min:float -> t_max:float -> Hit.t option
-  val leaf_length_histogram : t -> (int, int) Hashtbl.t
-end
-
-module Make (L : Leaf) : S with type leaf_elt := L.elt = struct
+module Make (L : Leaf) : Skd_tree_intf.S with type elt := L.elt = struct
   module Bshape = struct
     type t = {shape: L.elt; bbox: Bbox.t; centroid: P3.t}
 

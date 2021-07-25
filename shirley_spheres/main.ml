@@ -124,7 +124,7 @@ let background =
     let t = 0.5 *. (V3.dot d V3.unit_y +. 1.0) in
     Color.lerp t Color.white escape_color
 
-module Array_leaf = struct
+module Array_leaf : Skd_tree.Leaf with type elt = Sphere.t = struct
   type t = Sphere.t array
   type elt = Sphere.t
 
@@ -149,7 +149,7 @@ module Array_leaf = struct
     match !item with None -> None | Some s -> Some (!t_max, s)
 end
 
-module Simd_leaf = struct
+module Simd_leaf : Skd_tree.Leaf with type elt = Sphere.t = struct
   module FArray = Caml.Float.Array
 
   type f64array = FArray.t
@@ -212,7 +212,7 @@ module Simd_leaf = struct
       Some (t_hit, sph)
 end
 
-module type Spheres_S = Skd_tree.S with type leaf_elt := Sphere.t
+module type Spheres_S = Skd_tree.S with type elt := Sphere.t
 
 let main args =
   let {Args.width; height; spp; output; no_progress; max_bounces; no_simd} = args in
