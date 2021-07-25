@@ -1,9 +1,8 @@
 #![no_std]
-use core::panic::PanicInfo;
 use ocaml_sys::Value;
 
 #[panic_handler]
-fn panic(_panic: &PanicInfo<'_>) -> ! {
+fn panic(_panic: &core::panic::PanicInfo<'_>) -> ! {
     loop {}
 }
 
