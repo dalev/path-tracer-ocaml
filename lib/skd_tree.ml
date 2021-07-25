@@ -23,8 +23,7 @@ module Make (L : Leaf) : S with type elt := L.elt = struct
       {shape; bbox; centroid}
 
     let centroid_bbox bshapes =
-      let init = cbox (Slice.get bshapes 0) in
-      Slice.fold bshapes ~init ~f:(fun acc b -> Bbox.union acc (cbox b))
+      Slice.map_reduce bshapes ~transform:cbox ~combine:Bbox.union
   end
 
   type tree =
