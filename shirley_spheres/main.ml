@@ -152,8 +152,14 @@ module Spheres_leaf = struct
   type coords = {xs: f64array; ys: f64array; zs: f64array; rs: f64array}
   type t = {coords: coords; ms: Material.t array; length: int}
   type elt = Sphere.t
+
+  (* [float_ref]'s [float_contents] is unboxed (whereas the contents of [float ref] is boxed) *)
   type float_ref = {mutable float_contents: float}
 
+  (* To achieve [@@noalloc], we make a couple of compromises:
+     - the float_ref is an "output parameter": on return, contains the t_hit of the nearest sphere intersection.
+     - return [int] rather than [int option]: -1 indicates no intersection was found.
+       otherwise it's an index into the [coords] arrays indicating the closest intersection. *)
   external spheres_intersect_native :
     coords -> (float[@unboxed]) -> (float[@unboxed]) -> Ray.t -> float_ref -> int
     = "spheres_intersect_bytecode" "spheres_intersect_native"

@@ -40,6 +40,7 @@ unsafe fn make_slice<'a, T>(p: *const T) -> &'a [T] {
     slice::from_raw_parts(p, len)
 }
 
+// This is the entry point for the ocaml FFI call:
 #[no_mangle]
 pub extern "C" fn spheres_intersect_native(
     c: Raw,
