@@ -192,19 +192,15 @@ module Make (L : Leaf) : S with type elt := L.elt = struct
             let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
             let axis = Proposal.axis p in
             let to_axis = P3.axis axis in
-            let lhs_clip =
-              Slice.map_reduce l
-                ~transform:(fun s -> to_axis (Bbox.max (Bshape.bbox s)))
-                ~combine:Float.max in
-            let rhs_clip =
-              Slice.map_reduce r
-                ~transform:(fun s -> to_axis (Bbox.min (Bshape.bbox s)))
-                ~combine:Float.min in
+            let clip shapes bbox_f ~combine =
+              Slice.map_reduce shapes
+                ~transform:(fun s -> to_axis (bbox_f (Bshape.bbox s)))
+                ~combine in
             Branch
               { lhs= create_tree l
               ; rhs= create_tree r
-              ; lhs_clip
-              ; rhs_clip
+              ; lhs_clip= clip l Bbox.max ~combine:Float.max
+              ; rhs_clip= clip r Bbox.min ~combine:Float.min
               ; to_axis= V3.axis axis }
           else
             make_leaf shapes
