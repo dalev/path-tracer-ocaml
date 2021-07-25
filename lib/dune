@@ -1,7 +1,8 @@
 (rule
  (targets libsphere_intersect.a dllsphere_intersect.so)
  (deps
-  (env_var RUSTFLAGS)
+  ; we explicitly set RUSTFLAGS below, so I think it's correct not to explicitly depend on it here.
+  ; (env_var RUSTFLAGS)
   %{project_root}/sphere-intersect-rs/Cargo.toml
   %{project_root}/sphere-intersect-rs/Cargo.lock
   (source_tree %{project_root}/sphere-intersect-rs/src))
@@ -10,7 +11,10 @@
    (progn
     (chdir
      %{project_root}/sphere-intersect-rs
-     (run cargo build --release))
+     (setenv
+      RUSTFLAGS
+      "-C target-cpu=native"
+      (run cargo build --release)))
     (copy
      %{project_root}/sphere-intersect-rs/target/release/libsphere_intersect.a
      libsphere_intersect.a)
