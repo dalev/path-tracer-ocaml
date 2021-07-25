@@ -24,38 +24,42 @@ let path_tracer ~intersect ~background ~diffuse_plus_light ~camera =
       let u = samples.%{j} and v = samples.%{j + 1} in
       samples_index := j + 2 ;
       (u, v) in
-  let rec loop ray max_bounces =
+  let add_mul a b c = Color.Infix.(a + (b * c)) in
+  let rec loop ray max_bounces emit0 attn0 =
     if max_bounces <= 0 then
-      Color.black
+      add_mul emit0 attn0 Color.black
     else
       let max_bounces = max_bounces - 1 in
       match intersect ray with
-      | None -> background ray
+      | None -> add_mul emit0 attn0 (background ray)
       | Some h -> (
           let emit = Hit.emit h in
           let u, v = take_2d () in
           match (Hit.scatter h u : Scatter.t) with
-          | Absorb -> emit
+          | Absorb -> add_mul emit0 attn0 emit
           | Specular (scattered_ray, attenuation) ->
-              let open Color.Infix in
-              emit + (attenuation * loop scattered_ray max_bounces)
+              loop scattered_ray max_bounces
+                (add_mul emit attenuation emit0)
+                Color.Infix.(attenuation * attn0)
           | Diffuse attenuation ->
               let open Color.Infix in
               let ss = Hit.shader_space h in
               let dir = Pdf.sample diffuse_plus_light ss u v in
               let diffuse_pd = Pdf.eval Pdf.diffuse dir ss in
               if Float.( = ) diffuse_pd 0.0 then
-                emit
+                add_mul emit0 attn0 emit
               else
                 let divisor = Pdf.eval diffuse_plus_light dir ss in
                 let pd = diffuse_pd /. divisor in
                 if not (Float.is_finite pd) then
-                  emit
+                  add_mul emit0 attn0 emit
                 else
                   let scattered_ray = Shader_space.world_ray ss dir in
-                  emit + (Color.scale attenuation pd * loop scattered_ray max_bounces) )
-  in
-  loop ray max_bounces
+                  let attenuation = Color.scale attenuation pd in
+                  loop scattered_ray max_bounces
+                    (add_mul emit attenuation emit0)
+                    Color.Infix.(attenuation * attn0) ) in
+  loop ray max_bounces Color.black Color.white
 
 let create ~width ~height ~write_pixel ~samples_per_pixel ~max_bounces ~camera ~intersect
     ~background ~diffuse_plus_light =
