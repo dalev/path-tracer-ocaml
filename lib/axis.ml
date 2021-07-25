@@ -1,1 +1,4 @@
-type t = X | Y | Z
+type t =
+  | X
+  | Y
+  | Z

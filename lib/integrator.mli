@@ -1,7 +1,7 @@
 type t
 
-val create :
-     width:int
+val create
+  :  width:int
   -> height:int
   -> write_pixel:(x:int -> y:int -> Color.t -> unit)
   -> samples_per_pixel:int
