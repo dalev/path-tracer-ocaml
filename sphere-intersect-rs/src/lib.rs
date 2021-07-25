@@ -1,11 +1,17 @@
-use core::slice;
-use ocaml::Raw;
+#![no_std]
+use core::panic::PanicInfo;
+use ocaml_sys::Value;
+
+#[panic_handler]
+fn panic(_panic: &PanicInfo<'_>) -> ! {
+    loop {}
+}
 
 const LEAF_SIZE: usize = 16;
 
-#[ocaml::func]
-pub fn leaf_size() -> usize {
-    LEAF_SIZE
+#[no_mangle]
+pub extern "C" fn leaf_size() -> ocaml_sys::Value {
+    unsafe { ocaml_sys::val_int(LEAF_SIZE as isize) }
 }
 
 #[derive(Clone, Copy)]
@@ -15,7 +21,7 @@ struct V3 {
     z: f64,
 }
 
-impl std::convert::From<&[f64]> for V3 {
+impl core::convert::From<&[f64]> for V3 {
     fn from(s: &[f64]) -> V3 {
         V3 {
             x: s[0],
@@ -37,21 +43,21 @@ impl V3 {
 
 unsafe fn make_slice<'a, T>(p: *const T) -> &'a [T] {
     let len = ocaml_sys::caml_array_length(p as isize);
-    slice::from_raw_parts(p, len)
+    core::slice::from_raw_parts(p, len)
 }
 
 // This is the entry point for the ocaml FFI call:
 #[no_mangle]
 pub extern "C" fn spheres_intersect_native(
-    c: Raw,
+    c: Value,
     t_min: f64,
     t_max: f64,
-    ray: Raw,
-    t_hit_ref: Raw,
-) -> Raw {
+    ray: Value,
+    t_hit_ref: Value,
+) -> Value {
     unsafe {
-        let c = make_slice(c.0 as *const *const f64);
-        let ray = make_slice(ray.0 as *const *const f64);
+        let c = make_slice(c as *const *const f64);
+        let ray = make_slice(ray as *const *const f64);
         assert_eq!(c.len(), 4);
         assert_eq!(ray.len(), 3);
         let xs = make_slice(c[0]);
@@ -61,8 +67,8 @@ pub extern "C" fn spheres_intersect_native(
         let o = V3::from(make_slice(ray[0]));
         let d = V3::from(make_slice(ray[1]));
         let (t_found, found) = spheres_intersect_aux(xs, ys, zs, rs, o, d, t_min, t_max);
-        *(t_hit_ref.0 as *mut f64) = t_found;
-        ocaml::Raw(ocaml_sys::val_int(found))
+        *(t_hit_ref as *mut f64) = t_found;
+        ocaml_sys::val_int(found)
     }
 }
 

@@ -7,7 +7,8 @@ edition = "2018"
 [lib]
 crate-type = ["staticlib", "cdylib"]
 
+[profile.release]
+panic = "abort"
+
 [dependencies]
-ocaml = "*"
-ocaml-interop = "*"
-ocaml-sys = "*"
+ocaml-sys = "0.22"
