@@ -320,7 +320,11 @@ let main args =
     if no_progress
     then Integrator.render i ~update_progress:ignore
     else (
-      let p = Progress.Line.bar ~style:`UTF8 (Integrator.count_tiles i) in
+      let p =
+        let open Progress.Line in
+        let total = Integrator.count_tiles i in
+        list [ spinner (); elapsed (); bar ~style:`ASCII total; count_to total ]
+      in
       Progress.with_reporter p (fun report ->
           let update_progress () = report 1 in
           Integrator.render i ~update_progress))

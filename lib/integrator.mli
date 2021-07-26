@@ -13,4 +13,4 @@ val create
   -> t
 
 val count_tiles : t -> int
-val render : ?update_progress:(unit -> unit) -> t -> unit
+val render : update_progress:(unit -> unit) -> t -> unit

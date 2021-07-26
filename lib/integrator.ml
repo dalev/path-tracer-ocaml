@@ -176,7 +176,7 @@ let create_tile_samplers t tiles =
       tile, tile_sampler)
 ;;
 
-let render ?(update_progress = ignore) t =
+let render ~update_progress t =
   create_tile_samplers t t.tiles
   |> List.iter ~f:(fun (tile, sampler) ->
          render_tile t tile sampler;
