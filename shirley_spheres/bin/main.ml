@@ -251,16 +251,16 @@ module Simd_leaf : Skd_tree.Leaf with type elt = Sphere.t = struct
   ;;
 end
 
+module type Leaf_S = Skd_tree.Leaf with type elt = Sphere.t
 module type Spheres_S = Skd_tree.S with type elt := Sphere.t
 
 let main args =
   let { Args.width; height; spp; output; no_progress; max_bounces; no_simd } = args in
-  let spheres_mod =
-    if no_simd
-    then (module Skd_tree.Make (Array_leaf) : Spheres_S)
-    else (module Skd_tree.Make (Simd_leaf) : Spheres_S)
+  let leaf =
+    if no_simd then (module Array_leaf : Leaf_S) else (module Simd_leaf : Leaf_S)
   in
-  let module Spheres = (val spheres_mod : Spheres_S) in
+  let module Leaf = (val leaf : Leaf_S) in
+  let module Spheres : Spheres_S = Skd_tree.Make (Leaf) in
   let module Leaf_lengths = struct
     type s =
       { size : int
