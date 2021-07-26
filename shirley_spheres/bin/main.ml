@@ -323,7 +323,7 @@ let main args =
       let p =
         let open Progress.Line in
         let total = Integrator.count_tiles i in
-        list [ spinner (); elapsed (); bar ~style:`ASCII total; count_to total ]
+        list [ spinner (); elapsed (); bar ~style:`ASCII total; count_to total; spacer 4 ]
       in
       Progress.with_reporter p (fun report ->
           let update_progress () = report 1 in
