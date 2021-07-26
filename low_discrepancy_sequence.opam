@@ -5,6 +5,7 @@ homepage: "https://github.com/dalev/path-tracer-ocaml"
 bug-reports: "https://github.com/dalev/path-tracer-ocaml/issues"
 depends: [
   "dune" {>= "2.9"}
+  "alcotest" {with-test & >= "1.4"}
   "ocaml" {>= "4.12"}
   "odoc" {with-doc}
 ]
