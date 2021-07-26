@@ -292,9 +292,6 @@ let main args =
   in
   let () = printf "dim = %d x %d;\n" width height in
   let () = printf "#spheres = %d\n" (List.length spheres) in
-  let update_progress =
-    if no_progress then None else Some (fun pct -> printf "\rProgress: %3.1f%%%!" pct)
-  in
   let camera = camera (width // height) in
   let tree =
     List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
@@ -319,7 +316,15 @@ let main args =
       ~camera
       ~diffuse_plus_light:Pdf.diffuse
   in
-  let () = Integrator.render ?update_progress i in
+  let () =
+    if no_progress
+    then Integrator.render i ~update_progress:ignore
+    else (
+      let p = Progress.Line.bar ~style:`UTF8 (Integrator.count_tiles i) in
+      Progress.with_reporter p (fun report ->
+          let update_progress () = report 1 in
+          Integrator.render i ~update_progress))
+  in
   let () = printf "\n" in
   let () =
     match Bimage_io.write output img with

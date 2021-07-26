@@ -12,4 +12,5 @@ val create
   -> diffuse_plus_light:Pdf.t
   -> t
 
-val render : ?update_progress:(float -> unit) -> t -> unit
+val count_tiles : t -> int
+val render : ?update_progress:(unit -> unit) -> t -> unit

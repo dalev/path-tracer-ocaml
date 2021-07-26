@@ -4,7 +4,7 @@
  (name main)
  (preprocess
   (pps ppx_base))
- (libraries path_tracer sphere_lib base stdio bimage bimage-io)
+ (libraries path_tracer sphere_lib base stdio bimage bimage-io progress)
  (foreign_archives sphere_intersect))
 
 (rule

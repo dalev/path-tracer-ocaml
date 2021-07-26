@@ -1,6 +1,46 @@
 open! Base
 module L = Low_discrepancy_sequence
 
+module Tile = struct
+  type t =
+    { row : int
+    ; col : int
+    ; width : int
+    ; height : int
+    }
+
+  let area t = t.width * t.height
+
+  let split_width t =
+    let half_w = t.width / 2 in
+    let lhs = { t with width = half_w } in
+    let rhs = { t with col = t.col + half_w; width = t.width - half_w } in
+    lhs, rhs
+  ;;
+
+  let split_height t =
+    let half_h = t.height / 2 in
+    let lhs = { t with height = half_h } in
+    let rhs = { t with row = t.row + half_h; height = t.height - half_h } in
+    lhs, rhs
+  ;;
+
+  let split_once t = if t.width > t.height then split_width t else split_height t
+
+  let split t ~max_area =
+    let rec loop t =
+      if area t <= max_area
+      then [ t ]
+      else (
+        let lhs, rhs = split_once t in
+        loop lhs @ loop rhs)
+    in
+    loop t
+  ;;
+
+  let create ~width ~height = { row = 0; col = 0; width; height }
+end
+
 type t =
   { width : int
   ; height : int
@@ -10,7 +50,10 @@ type t =
   ; camera : Camera.t
   ; trace_path :
       cx:float -> cy:float -> int -> Low_discrepancy_sequence.Sample.t -> Color.t
+  ; tiles : Tile.t list
   }
+
+let count_tiles t = List.length t.tiles
 
 let path_tracer ~intersect ~background ~diffuse_plus_light ~camera =
   Staged.stage
@@ -82,48 +125,18 @@ let create
   let trace_path =
     Staged.unstage @@ path_tracer ~intersect ~background ~diffuse_plus_light ~camera
   in
-  { width; height; write_pixel; samples_per_pixel; max_bounces; camera; trace_path }
+  let max_area = 32 * 32 in
+  let tiles = Tile.split ~max_area (Tile.create ~width ~height) in
+  { width
+  ; height
+  ; write_pixel
+  ; samples_per_pixel
+  ; max_bounces
+  ; camera
+  ; trace_path
+  ; tiles
+  }
 ;;
-
-module Tile = struct
-  type t =
-    { row : int
-    ; col : int
-    ; width : int
-    ; height : int
-    }
-
-  let area t = t.width * t.height
-
-  let split_width t =
-    let half_w = t.width / 2 in
-    let lhs = { t with width = half_w } in
-    let rhs = { t with col = t.col + half_w; width = t.width - half_w } in
-    lhs, rhs
-  ;;
-
-  let split_height t =
-    let half_h = t.height / 2 in
-    let lhs = { t with height = half_h } in
-    let rhs = { t with row = t.row + half_h; height = t.height - half_h } in
-    lhs, rhs
-  ;;
-
-  let split_once t = if t.width > t.height then split_width t else split_height t
-
-  let split t ~max_area =
-    let rec loop t =
-      if area t <= max_area
-      then [ t ]
-      else (
-        let lhs, rhs = split_once t in
-        loop lhs @ loop rhs)
-    in
-    loop t
-  ;;
-
-  let create ~width ~height = { row = 0; col = 0; width; height }
-end
 
 let gamma = Color.map ~f:Float.sqrt
 
@@ -164,12 +177,8 @@ let create_tile_samplers t tiles =
 ;;
 
 let render ?(update_progress = ignore) t =
-  let max_area = 32 * 32 in
-  let tiles = Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height) in
-  let num_tiles = List.length tiles in
-  let tiles_and_samplers = create_tile_samplers t tiles in
-  tiles_and_samplers
-  |> List.iteri ~f:(fun i (tile, sampler) ->
+  create_tile_samplers t t.tiles
+  |> List.iter ~f:(fun (tile, sampler) ->
          render_tile t tile sampler;
-         update_progress ((i + 1) * 100 // num_tiles))
+         update_progress ())
 ;;
