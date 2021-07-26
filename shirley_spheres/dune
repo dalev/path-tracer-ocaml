@@ -4,4 +4,4 @@
  (name main)
  (preprocess
   (pps ppx_base))
- (libraries path_tracer base stdio bimage bimage-io lwt lwt.unix))
+ (libraries path_tracer base bimage bimage-io lwt lwt.unix))
