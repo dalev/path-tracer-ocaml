@@ -1,28 +1,3 @@
-(rule
- (targets libsphere_intersect.a dllsphere_intersect.so)
- (deps
-  ; we explicitly set RUSTFLAGS below, so I think it's correct not to depend on it here.
-  ; (env_var RUSTFLAGS)
-  %{project_root}/sphere-intersect-rs/Cargo.toml
-  %{project_root}/sphere-intersect-rs/Cargo.lock
-  (source_tree %{project_root}/sphere-intersect-rs/src))
- (action
-  (no-infer
-   (progn
-    (chdir
-     %{project_root}/sphere-intersect-rs
-     (setenv
-      RUSTFLAGS
-      "-C target-cpu=native"
-      (run cargo build --release)))
-    (copy
-     %{project_root}/sphere-intersect-rs/target/release/libsphere_intersect.a
-     libsphere_intersect.a)
-    (copy
-     %{project_root}/sphere-intersect-rs/target/release/libsphere_intersect.so
-     dllsphere_intersect.so)))))
-
 (library
  (name path_tracer)
- (libraries base lwt lwt.unix low_discrepancy_sequence)
- (foreign_archives sphere_intersect))
+ (libraries base lwt lwt.unix low_discrepancy_sequence))
