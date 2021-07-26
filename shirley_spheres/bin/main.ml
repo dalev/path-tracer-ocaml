@@ -137,7 +137,9 @@ let background =
     Color.lerp t Color.white escape_color
 ;;
 
-module Array_leaf : Skd_tree.Leaf with type elt = Sphere.t = struct
+module type Leaf_S = Skd_tree.Leaf with type elt = Sphere.t
+
+module Array_leaf : Leaf_S = struct
   type t = Sphere.t array
   type elt = Sphere.t
 
@@ -165,7 +167,7 @@ module Array_leaf : Skd_tree.Leaf with type elt = Sphere.t = struct
   ;;
 end
 
-module Simd_leaf : Skd_tree.Leaf with type elt = Sphere.t = struct
+module Simd_leaf : Leaf_S = struct
   module FArray = Caml.Float.Array
 
   type f64array = FArray.t
@@ -251,7 +253,6 @@ module Simd_leaf : Skd_tree.Leaf with type elt = Sphere.t = struct
   ;;
 end
 
-module type Leaf_S = Skd_tree.Leaf with type elt = Sphere.t
 module type Spheres_S = Skd_tree.S with type elt := Sphere.t
 
 let main args =
