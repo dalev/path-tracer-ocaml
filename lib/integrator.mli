@@ -12,4 +12,4 @@ val create
   -> diffuse_plus_light:Pdf.t
   -> t
 
-val render : ?update_progress:(float -> unit Lwt.t) -> t -> unit Lwt.t
+val render : ?update_progress:(float -> unit) -> t -> unit

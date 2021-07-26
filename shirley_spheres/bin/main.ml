@@ -1,5 +1,5 @@
 open! Base
-open Lwt.Syntax
+open Stdio
 open Path_tracer
 open Sphere_lib
 module Image = Bimage.Image
@@ -290,22 +290,20 @@ let main args =
     Random.init 42;
     Shirley_spheres.spheres ()
   in
-  let* () = Lwt_io.printf "dim = %d x %d;\n" width height in
-  let* () = Lwt_io.printf "#spheres = %d\n" (List.length spheres) in
+  let () = printf "dim = %d x %d;\n" width height in
+  let () = printf "#spheres = %d\n" (List.length spheres) in
   let update_progress =
-    if no_progress
-    then None
-    else Some (fun pct -> Lwt_io.printf "\rProgress: %3.1f%%" pct)
+    if no_progress then None else Some (fun pct -> printf "\rProgress: %3.1f%%%!" pct)
   in
   let camera = camera (width // height) in
   let tree =
     List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
     |> Spheres.create
   in
-  let* () = Lwt_io.printf "tree depth = %d\n" (Spheres.depth tree) in
-  let* () =
-    Lwt_io.printf
-      "leaf lengths =\n%s\n"
+  let () = printf "tree depth = %d\n" (Spheres.depth tree) in
+  let () =
+    printf
+      "leaf lengths =\n%s\n%!"
       (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree))
   in
   let i =
@@ -321,15 +319,15 @@ let main args =
       ~camera
       ~diffuse_plus_light:Pdf.diffuse
   in
-  let* () = Integrator.render ?update_progress i in
-  let* () = Lwt_io.printf "\n" in
-  let* () =
+  let () = Integrator.render ?update_progress i in
+  let () = printf "\n" in
+  let () =
     match Bimage_io.write output img with
-    | Ok () -> Lwt.return_unit
-    | Error (`File_not_found f) -> Lwt_io.printf "File not found: %s" f
-    | Error (#Bimage.Error.t as other) -> Lwt.return @@ Bimage.Error.unwrap (Error other)
+    | Ok () -> ()
+    | Error (`File_not_found f) -> printf "File not found: %s" f
+    | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other)
   in
-  Lwt_io.printf "Done\n"
+  printf "Done\n"
 ;;
 
-let () = Lwt_main.run @@ main (Args.parse ())
+let () = main (Args.parse ())

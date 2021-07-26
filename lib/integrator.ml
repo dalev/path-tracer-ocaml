@@ -1,5 +1,4 @@
 open! Base
-open Lwt.Syntax
 module L = Low_discrepancy_sequence
 
 type t =
@@ -164,17 +163,13 @@ let create_tile_samplers t tiles =
       tile, tile_sampler)
 ;;
 
-let render ?(update_progress = fun _ -> Lwt.return ()) t =
+let render ?(update_progress = ignore) t =
   let max_area = 32 * 32 in
   let tiles = Tile.split ~max_area (Tile.create ~width:t.width ~height:t.height) in
   let num_tiles = List.length tiles in
   let tiles_and_samplers = create_tile_samplers t tiles in
-  let* () = Lwt_io.printf "#tiles = %d\n" num_tiles in
   tiles_and_samplers
-  |> Lwt_list.iteri_s (fun i (tile, sampler) ->
-         let* () =
-           (* detach so that the progress output can flush *)
-           Lwt_preemptive.detach (fun () -> render_tile t tile sampler) ()
-         in
+  |> List.iteri ~f:(fun i (tile, sampler) ->
+         render_tile t tile sampler;
          update_progress ((i + 1) * 100 // num_tiles))
 ;;
