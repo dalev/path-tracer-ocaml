@@ -290,19 +290,17 @@ let main args =
     Random.init 42;
     Shirley_spheres.spheres ()
   in
-  let () = printf "dim = %d x %d;\n" width height in
-  let () = printf "#spheres = %d\n" (List.length spheres) in
+  printf "dim = %d x %d;\n" width height;
+  printf "#spheres = %d\n" (List.length spheres);
   let camera = camera (width // height) in
   let tree =
     List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
     |> Spheres.create
   in
-  let () = printf "tree depth = %d\n" (Spheres.depth tree) in
-  let () =
-    printf
-      "leaf lengths =\n%s\n%!"
-      (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree))
-  in
+  printf "tree depth = %d\n" (Spheres.depth tree);
+  printf
+    "leaf lengths =\n%s\n%!"
+    (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree));
   let i =
     let intersect r = Spheres.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value in
     Integrator.create
@@ -329,7 +327,7 @@ let main args =
           let update_progress () = report 1 in
           Integrator.render i ~update_progress))
   in
-  let () = printf "\n" in
+  printf "\n";
   let () =
     match Bimage_io.write output img with
     | Ok () -> ()
