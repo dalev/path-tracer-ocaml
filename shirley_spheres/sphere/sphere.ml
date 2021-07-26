@@ -1,4 +1,5 @@
 open! Base
+open Path_tracer
 
 type t =
   { material : Material.t

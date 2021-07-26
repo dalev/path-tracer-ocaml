@@ -1,0 +1,3 @@
+(library
+ (name sphere_lib)
+ (libraries base path_tracer))

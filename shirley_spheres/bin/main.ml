@@ -1,6 +1,7 @@
 open! Base
 open Lwt.Syntax
 open Path_tracer
+open Sphere_lib
 module Image = Bimage.Image
 
 module Args = struct

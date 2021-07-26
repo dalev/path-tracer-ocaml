@@ -1,6 +1,7 @@
 open! Core
 open Core_bench
 open Path_tracer
+open Sphere_lib
 
 let unit_bbox = Bbox.create ~min:P3.origin ~max:(P3.create ~x:1.0 ~y:1.0 ~z:1.0)
 
