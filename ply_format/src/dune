@@ -1,5 +1,5 @@
 (library
  (name ply_format)
- (libraries base stdio)
+ (libraries base stdio ppx_sexp_message)
  (preprocess
-  (pps ppx_base)))
+  (pps ppx_base ppx_sexp_message)))

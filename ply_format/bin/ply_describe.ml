@@ -12,5 +12,5 @@ let () =
   let argv = Sys.get_argv () in
   if Array.length argv <> 2 then failwith "expected argument: path to .ply file";
   let ply = In_channel.with_file argv.(1) ~binary:true ~f:Ply.of_in_channel in
-  main ply
+  main (Or_error.ok_exn ply)
 ;;
