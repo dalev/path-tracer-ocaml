@@ -20,15 +20,34 @@ module Format = struct
   ;;
 end
 
+module Type = struct
+  type t =
+    | Char
+    | Uchar
+    | Short
+    | Ushort
+    | Int
+    | Uint
+    | Float
+    | Double
+  [@@deriving sexp]
+
+  let of_string s =
+    match [%of_sexp: t] @@ Sexp.Atom s with
+    | t -> Ok t
+    | exception _ -> error_s [%message "unrecognized type" ~type_:(s : string)]
+  ;;
+end
+
 module Property = struct
   type t =
     | Atom of
-        { type_ : string
+        { type_ : Type.t
         ; name : string
         }
     | List of
-        { length_type : string
-        ; elt_type : string
+        { length_type : Type.t
+        ; elt_type : Type.t
         ; name : string
         }
   [@@deriving sexp_of]
@@ -36,8 +55,12 @@ module Property = struct
   let parse line =
     match String.split ~on:' ' line with
     | [ "property"; "list"; length_type; elt_type; name ] ->
+      let* length_type = Type.of_string length_type in
+      let* elt_type = Type.of_string elt_type in
       Ok (List { length_type; elt_type; name })
-    | [ "property"; type_; name ] -> Ok (Atom { type_; name })
+    | [ "property"; type_; name ] ->
+      let* type_ = Type.of_string type_ in
+      Ok (Atom { type_; name })
     | _ -> error_s [%message "cannot parse property" ~line (line : string)]
   ;;
 end
