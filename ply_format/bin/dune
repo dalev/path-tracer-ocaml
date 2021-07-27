@@ -1,0 +1,3 @@
+(executable
+ (name ply_describe)
+ (libraries base stdio ply_format))
