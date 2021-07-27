@@ -1,3 +1,5 @@
 (executable
  (name ply_describe)
- (libraries base stdio ply_format))
+ (libraries base stdio ply_format)
+ (preprocess
+  (pps ppx_base)))
