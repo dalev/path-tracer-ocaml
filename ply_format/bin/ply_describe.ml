@@ -1,6 +1,7 @@
 open! Base
 open Stdio
 open Ply_format
+module Bigstring = Base_bigstring
 
 let main ply =
   printf
@@ -11,6 +12,13 @@ let main ply =
 let () =
   let argv = Sys.get_argv () in
   if Array.length argv <> 2 then failwith "expected argument: path to .ply file";
-  let ply = In_channel.with_file argv.(1) ~binary:true ~f:Ply.of_in_channel in
+  let shared = false in
+  let fd = Unix.openfile argv.(1) [ Unix.O_RDONLY ] 0o600 in
+  let (bs : Bigstring.t) =
+    Bigarray.array1_of_genarray
+    @@ Unix.map_file fd Bigarray.char Bigarray.c_layout shared [| -1 |]
+  in
+  let ply = Ply.of_bigstring bs in
+  Unix.close fd;
   main (Or_error.ok_exn ply)
 ;;

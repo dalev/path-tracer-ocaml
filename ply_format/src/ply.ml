@@ -1,5 +1,6 @@
 open! Base
-open Stdio
+module Bigstring = Core_kernel.Bigstring
+module Bigsubstring = Core_kernel.Bigsubstring
 
 let ( let* ) m f = Or_error.bind m ~f
 let error_s = Or_error.error_s
@@ -37,6 +38,13 @@ module Type = struct
     | t -> Ok t
     | exception _ -> error_s [%message "unrecognized type" ~type_:(s : string)]
   ;;
+
+  let size = function
+    | Char | Uchar -> 1
+    | Short | Ushort -> 2
+    | Int | Uint | Float -> 4
+    | Double -> 8
+  ;;
 end
 
 module Property = struct
@@ -63,6 +71,16 @@ module Property = struct
       Ok (Atom { type_; name })
     | _ -> error_s [%message "cannot parse property" ~line (line : string)]
   ;;
+
+  let is_atomic = function
+    | Atom _ -> true
+    | List _ -> false
+  ;;
+
+  let size_exn = function
+    | Atom { type_; _ } -> Type.size type_
+    | List _ -> failwith "BUG: Property.size_exn of List"
+  ;;
 end
 
 module Element = struct
@@ -73,7 +91,45 @@ module Element = struct
     }
   [@@deriving sexp_of]
 
+  let name t = t.name
+  let count t = t.count
+  let properties t = t.properties
   let create ~name ~count properties = { name; count; properties }
+
+  let width t =
+    if List.for_all t.properties ~f:Property.is_atomic
+    then `Fixed (List.sum (module Int) t.properties ~f:Property.size_exn)
+    else `Variable
+  ;;
+end
+
+module Input = struct
+  type t = { mutable buf : Bigsubstring.t }
+
+  let consume_substring t ~pos ~len =
+    let s = Bigsubstring.sub t.buf ~pos ~len |> Bigsubstring.to_string in
+    t.buf <- Bigsubstring.drop_prefix t.buf (pos + len);
+    s
+  ;;
+
+  let create buf = { buf = Bigsubstring.create buf }
+  let length t = Bigsubstring.length t.buf
+
+  let read_line t =
+    let base = Bigsubstring.base t.buf in
+    let pos = Bigsubstring.pos t.buf in
+    let len = Bigsubstring.length t.buf in
+    match Bigstring.find '\n' base ~pos ~len with
+    | None ->
+      let line = t.buf in
+      t.buf <- Bigsubstring.create (Bigstring.create 0);
+      Some (Bigsubstring.to_string line)
+    | Some base_nl_idx ->
+      let line_len = base_nl_idx - pos in
+      let line = Bigsubstring.prefix t.buf line_len in
+      t.buf <- Bigsubstring.drop_prefix t.buf (line_len + 1);
+      Some (Bigsubstring.to_string line)
+  ;;
 end
 
 module Header = struct
@@ -116,7 +172,7 @@ module Header = struct
 
   let parse ic =
     let rec loop lines =
-      match In_channel.input_line ic with
+      match Input.read_line ic with
       | Some "end_header" -> Ok (List.rev lines)
       | Some l -> loop (l :: lines)
       | None -> error_string "missing \"end_header\" line"
@@ -129,7 +185,7 @@ module Header = struct
 end
 
 module Data = struct
-  type t = unit
+  type t = (string * unit) list
 end
 
 type t =
@@ -140,25 +196,27 @@ type t =
 let header t = t.header
 
 let check_file_magic ic =
-  let b = Bytes.unsafe_of_string_promise_no_mutation in
-  let buf = Bytes.create 4 in
-  match In_channel.really_input ic ~buf ~pos:0 ~len:4 with
-  | None -> error_string "Could not read ply header (not enough bytes)"
-  | Some () ->
-    if Bytes.( <> ) buf (b "ply\n")
-    then
-      errorf
-        "expected file to start with \"ply\\n\", but got: %s"
-        (Bytes.unsafe_to_string ~no_mutation_while_string_reachable:buf)
-    else Ok ()
+  if Input.length ic < 4
+  then error_string "Could not read ply header (not enough bytes)"
+  else (
+    match Input.consume_substring ic ~pos:0 ~len:4 with
+    | "ply\n" -> Ok ()
+    | other -> errorf "expected file to start with \"ply\\n\", but got: %s" other)
 ;;
 
 let read_binary_le h _ic =
-  let (_ : Element.t list) = Header.elements h in
-  Ok ()
+  Ok
+    (List.map (Header.elements h) ~f:(fun e ->
+         let name = Element.name e in
+         let _count = Element.count e in
+         let _ps = Element.properties e in
+         match Element.width e with
+         | `Fixed _width -> name, ()
+         | `Variable -> name, ()))
 ;;
 
-let of_in_channel (ic : In_channel.t) =
+let of_bigstring (b : Bigstring.t) =
+  let ic = Input.create b in
   let* () = check_file_magic ic in
   let* header = Header.parse ic in
   let fmt = Header.format header in

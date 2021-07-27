@@ -1,5 +1,4 @@
 open Base
-open Stdio
 
 type t
 
@@ -8,4 +7,4 @@ module Header : sig
 end
 
 val header : t -> Header.t
-val of_in_channel : In_channel.t -> t Or_error.t
+val of_bigstring : Bigstringaf.t -> t Or_error.t
