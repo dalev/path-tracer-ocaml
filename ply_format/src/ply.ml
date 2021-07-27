@@ -252,21 +252,22 @@ let check_file_magic ic =
 ;;
 
 let read_binary_le h ic =
-  Ok
-    (List.map (Header.elements h) ~f:(fun e ->
-         let name = Element.name e in
-         let count = Element.count e in
-         let ps = Element.properties e in
-         match Element.width e with
-         | `Fixed width ->
-           let extractors, values = List.unzip @@ Property.create_values ps ~len:count in
-           let values = Map.of_alist_exn (module String) values in
-           for i = 0 to count - 1 do
-             let buf = Input.take ic ~len:width in
-             List.iter extractors ~f:(fun extract -> extract i buf)
-           done;
-           name, values
-         | `Variable -> name, Map.empty (module String)))
+  let read_element e =
+    let name = Element.name e in
+    let count = Element.count e in
+    let ps = Element.properties e in
+    match Element.width e with
+    | `Fixed width ->
+      let extractors, values = List.unzip @@ Property.create_values ps ~len:count in
+      let values = Map.of_alist_exn (module String) values in
+      for i = 0 to count - 1 do
+        let buf = Input.take ic ~len:width in
+        List.iter extractors ~f:(fun extract -> extract i buf)
+      done;
+      name, values
+    | `Variable -> name, Map.empty (module String)
+  in
+  Ok (List.map (Header.elements h) ~f:read_element)
 ;;
 
 let of_bigstring (b : Bigstring.t) =
