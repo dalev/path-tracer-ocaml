@@ -4,9 +4,7 @@ open Ply_format
 module Bigstring = Base_bigstring
 
 let main ply =
-  printf
-    "== Header ==\n{%s}\n"
-    (Ply.header ply |> [%sexp_of: Ply.Header.t] |> Sexp.to_string_hum)
+  printf "== PLY Summary ==\n{%s}\n" (ply |> [%sexp_of: Ply.t] |> Sexp.to_string_hum)
 ;;
 
 let () =

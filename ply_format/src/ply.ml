@@ -81,6 +81,36 @@ module Property = struct
     | Atom { type_; _ } -> Type.size type_
     | List _ -> failwith "BUG: Property.size_exn of List"
   ;;
+
+  module Values = struct
+    type t = Floats of floatarray
+
+    let sexp_of_t = function
+      | Floats fs -> [%message "floatarray" ~length:(Caml.Float.Array.length fs : int)]
+    ;;
+  end
+
+  let create_values ts ~len =
+    let offset = ref 0 in
+    List.map ts ~f:(fun t ->
+        match t with
+        | List _ -> failwith "BUG: create_values of List"
+        | Atom { type_; name } ->
+          let size = Type.size type_ in
+          let pos = !offset in
+          offset := !offset + size;
+          (match (type_ : Type.t) with
+          | Float ->
+            let a = Caml.Float.Array.create len in
+            let extract i s =
+              let base = Bigsubstring.base s in
+              let pos = Bigsubstring.pos s + pos in
+              let n = Int32.float_of_bits @@ Bigstringaf.get_int32_le base pos in
+              Caml.Float.Array.set a i n
+            in
+            extract, (name, Values.Floats a)
+          | _ -> assert false))
+  ;;
 end
 
 module Element = struct
@@ -105,6 +135,12 @@ end
 
 module Input = struct
   type t = { mutable buf : Bigsubstring.t }
+
+  let take t ~len =
+    let prefix = Bigsubstring.prefix t.buf len in
+    t.buf <- Bigsubstring.drop_prefix t.buf len;
+    prefix
+  ;;
 
   let consume_substring t ~pos ~len =
     let s = Bigsubstring.sub t.buf ~pos ~len |> Bigsubstring.to_string in
@@ -185,13 +221,24 @@ module Header = struct
 end
 
 module Data = struct
-  type t = (string * unit) list
+  type t =
+    ( string
+    , (string, Property.Values.t, String.comparator_witness) Map.t
+    , String.comparator_witness )
+    Map.t
+
+  let sexp_of_t =
+    Map.sexp_of_m__t
+      (module String)
+      (Map.sexp_of_m__t (module String) Property.Values.sexp_of_t)
+  ;;
 end
 
 type t =
   { header : Header.t
   ; data : Data.t
   }
+[@@deriving sexp_of]
 
 let header t = t.header
 
@@ -204,15 +251,22 @@ let check_file_magic ic =
     | other -> errorf "expected file to start with \"ply\\n\", but got: %s" other)
 ;;
 
-let read_binary_le h _ic =
+let read_binary_le h ic =
   Ok
     (List.map (Header.elements h) ~f:(fun e ->
          let name = Element.name e in
-         let _count = Element.count e in
-         let _ps = Element.properties e in
+         let count = Element.count e in
+         let ps = Element.properties e in
          match Element.width e with
-         | `Fixed _width -> name, ()
-         | `Variable -> name, ()))
+         | `Fixed width ->
+           let extractors, values = List.unzip @@ Property.create_values ps ~len:count in
+           let values = Map.of_alist_exn (module String) values in
+           for i = 0 to count - 1 do
+             let buf = Input.take ic ~len:width in
+             List.iter extractors ~f:(fun extract -> extract i buf)
+           done;
+           name, values
+         | `Variable -> name, Map.empty (module String)))
 ;;
 
 let of_bigstring (b : Bigstring.t) =
@@ -226,5 +280,5 @@ let of_bigstring (b : Bigstring.t) =
     | Binary_big_endian | Ascii ->
       error_s [%message "to do: handle message format" ~format:(fmt : Format.t)]
   in
-  Ok { header; data }
+  Ok { header; data = Map.of_alist_exn (module String) data }
 ;;
