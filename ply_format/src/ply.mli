@@ -4,7 +4,7 @@ open Stdio
 type t
 
 module Header : sig
-  type t = string list [@@deriving sexp_of]
+  type t [@@deriving sexp_of]
 end
 
 val header : t -> Header.t
