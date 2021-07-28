@@ -1,5 +1,5 @@
 (library
  (name ply_format)
- (libraries base bigstringaf core_kernel parsexp ppx_sexp_message)
+ (libraries base base_bigstring bigstringaf parsexp ppx_sexp_message)
  (preprocess
   (pps ppx_base ppx_sexp_message)))

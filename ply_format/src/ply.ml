@@ -1,11 +1,50 @@
 open! Base
-module Bigstring = Core_kernel.Bigstring
-module Bigsubstring = Core_kernel.Bigsubstring
+module Bigstring = Base_bigstring
 
 let ( let* ) m f = Or_error.bind m ~f
 let error_s = Or_error.error_s
 let errorf = Or_error.errorf
 let error_string = Or_error.error_string
+
+module Input : sig
+  type t
+
+  val create : Bigstring.t -> t
+  val length : t -> int
+  val take : t -> len:int -> string
+  val read_line : t -> string option
+  val base : t -> Bigstring.t
+end = struct
+  type t =
+    { buf : Bigstring.t
+    ; mutable pos : int
+    }
+
+  let base t = t.buf
+
+  let take t ~len =
+    let prefix = Bigstring.To_string.sub t.buf ~pos:t.pos ~len in
+    t.pos <- t.pos + len;
+    prefix
+  ;;
+
+  let create buf = { buf; pos = 0 }
+  let length t = Bigstring.length t.buf - t.pos
+
+  let read_line t =
+    let base = t.buf in
+    let pos = t.pos in
+    let len = length t in
+    match Bigstring.find '\n' base ~pos ~len with
+    | None ->
+      t.pos <- pos + len;
+      Some (Bigstring.To_string.sub t.buf ~pos ~len)
+    | Some nl_idx ->
+      let len = nl_idx - pos in
+      t.pos <- nl_idx + 1;
+      Some (Bigstring.To_string.sub t.buf ~pos ~len)
+  ;;
+end
 
 module Format = struct
   type t =
@@ -91,21 +130,21 @@ module Property = struct
   end
 
   let create_values ts ~len =
-    let offset = ref 0 in
+    let field_offset = ref 0 in
     List.map ts ~f:(fun t ->
         match t with
         | List _ -> failwith "BUG: create_values of List"
         | Atom { type_; name } ->
           let size = Type.size type_ in
-          let pos = !offset in
-          offset := !offset + size;
+          let offset = !field_offset in
+          field_offset := !field_offset + size;
           (match (type_ : Type.t) with
           | Float ->
             let a = Caml.Float.Array.create len in
-            let extract i s =
-              let base = Bigsubstring.base s in
-              let pos = Bigsubstring.pos s + pos in
-              let n = Int32.float_of_bits @@ Bigstringaf.get_int32_le base pos in
+            let extract ic ~row_start i =
+              let base = Input.base ic in
+              let field_start = row_start + offset in
+              let n = Int32.float_of_bits @@ Bigstringaf.get_int32_le base field_start in
               Caml.Float.Array.set a i n
             in
             extract, (name, Values.Floats a)
@@ -130,41 +169,6 @@ module Element = struct
     if List.for_all t.properties ~f:Property.is_atomic
     then `Fixed (List.sum (module Int) t.properties ~f:Property.size_exn)
     else `Variable
-  ;;
-end
-
-module Input = struct
-  type t = { mutable buf : Bigsubstring.t }
-
-  let take t ~len =
-    let prefix = Bigsubstring.prefix t.buf len in
-    t.buf <- Bigsubstring.drop_prefix t.buf len;
-    prefix
-  ;;
-
-  let consume_substring t ~pos ~len =
-    let s = Bigsubstring.sub t.buf ~pos ~len |> Bigsubstring.to_string in
-    t.buf <- Bigsubstring.drop_prefix t.buf (pos + len);
-    s
-  ;;
-
-  let create buf = { buf = Bigsubstring.create buf }
-  let length t = Bigsubstring.length t.buf
-
-  let read_line t =
-    let base = Bigsubstring.base t.buf in
-    let pos = Bigsubstring.pos t.buf in
-    let len = Bigsubstring.length t.buf in
-    match Bigstring.find '\n' base ~pos ~len with
-    | None ->
-      let line = t.buf in
-      t.buf <- Bigsubstring.create (Bigstring.create 0);
-      Some (Bigsubstring.to_string line)
-    | Some base_nl_idx ->
-      let line_len = base_nl_idx - pos in
-      let line = Bigsubstring.prefix t.buf line_len in
-      t.buf <- Bigsubstring.drop_prefix t.buf (line_len + 1);
-      Some (Bigsubstring.to_string line)
   ;;
 end
 
@@ -246,7 +250,8 @@ let check_file_magic ic =
   if Input.length ic < 4
   then error_string "Could not read ply header (not enough bytes)"
   else (
-    match Input.consume_substring ic ~pos:0 ~len:4 with
+    let prefix = Input.take ic ~len:4 in
+    match prefix with
     | "ply\n" -> Ok ()
     | other -> errorf "expected file to start with \"ply\\n\", but got: %s" other)
 ;;
@@ -261,8 +266,8 @@ let read_binary_le h ic =
       let extractors, values = List.unzip @@ Property.create_values ps ~len:count in
       let values = Map.of_alist_exn (module String) values in
       for i = 0 to count - 1 do
-        let buf = Input.take ic ~len:width in
-        List.iter extractors ~f:(fun extract -> extract i buf)
+        let row_start = width * i in
+        List.iter extractors ~f:(fun extract -> extract ic ~row_start i)
       done;
       name, values
     | `Variable -> name, Map.empty (module String)
