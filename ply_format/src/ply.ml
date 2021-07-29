@@ -77,9 +77,13 @@ module Type = struct
   [@@deriving sexp]
 
   let of_string s =
-    match [%of_sexp: t] @@ Sexp.Atom s with
-    | t -> Ok t
-    | exception _ -> error_s [%message "unrecognized type" ~type_:(s : string)]
+    match s with
+    | "uint8" -> Ok Uchar
+    | "int8" -> Ok Char
+    | _ ->
+      (match [%of_sexp: t] @@ Sexp.Atom s with
+      | t -> Ok t
+      | exception _ -> error_s [%message "unrecognized type" ~type_:(s : string)])
   ;;
 
   let size = function
