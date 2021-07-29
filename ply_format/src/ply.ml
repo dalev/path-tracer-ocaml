@@ -13,7 +13,9 @@ module Input : sig
   val length : t -> int
   val take : t -> len:int -> string
   val read_line : t -> string option
+  val advance : t -> int -> unit
   val base : t -> Bigstring.t
+  val pos : t -> int
 end = struct
   type t =
     { buf : Bigstring.t
@@ -21,6 +23,8 @@ end = struct
     }
 
   let base t = t.buf
+  let pos t = t.pos
+  let advance t count = t.pos <- t.pos + count
 
   let take t ~len =
     let prefix = Bigstring.To_string.sub t.buf ~pos:t.pos ~len in
@@ -137,47 +141,54 @@ module Property = struct
     | List _ -> failwith "BUG: Property.size_exn of List"
   ;;
 
-  module Values = struct
+  module Column = struct
+    type row = int array
+
     type t =
       | Floats of floatarray
       | Ints of int array
+      | Rows of row array
 
     let sexp_of_t = function
       | Floats fs -> [%message "floatarray" ~length:(Caml.Float.Array.length fs : int)]
       | Ints is -> [%message "int array" ~length:(Array.length is : int)]
+      | Rows rs -> [%message "row array" ~length:(Array.length rs : int)]
     ;;
   end
 
-  let create_values ts ~len =
+  let create_columns ts ~len =
     let field_offset = ref 0 in
-    List.map ts ~f:(fun t ->
-        match t with
-        | List _ -> failwith "BUG: create_values of List"
-        | Atom { type_; name } ->
-          let size = Type.size type_ in
-          let offset = !field_offset in
-          field_offset := !field_offset + size;
-          (match (type_ : Type.t) with
-          | Float | Double ->
-            let get_float = Type.float_accessor_exn type_ in
-            let a = Caml.Float.Array.create len in
-            let extract ic ~row_start i =
-              let base = Input.base ic in
-              let field_start = row_start + offset in
-              let n = get_float base ~pos:field_start in
-              Caml.Float.Array.set a i n
-            in
-            extract, (name, Values.Floats a)
-          | Char | Uchar | Short | Ushort | Int | Uint ->
-            let get_int = Type.int_accessor_exn type_ in
-            let a = Array.create ~len 0 in
-            let extract ic ~row_start i =
-              let base = Input.base ic in
-              let field_start = row_start + offset in
-              let n = get_int base ~pos:field_start in
-              Array.set a i n
-            in
-            extract, (name, Values.Ints a)))
+    let create_column t =
+      match t with
+      | List _ -> failwith "BUG: create_columns of List"
+      | Atom { type_; name } ->
+        let size = Type.size type_ in
+        let offset = !field_offset in
+        field_offset := !field_offset + size;
+        (match (type_ : Type.t) with
+        | Float | Double ->
+          let get_float = Type.float_accessor_exn type_ in
+          let a = Caml.Float.Array.create len in
+          let extract ic ~row_start i =
+            let base = Input.base ic in
+            let field_start = row_start + offset in
+            let n = get_float base ~pos:field_start in
+            Caml.Float.Array.set a i n
+          in
+          extract, (name, Column.Floats a)
+        | Char | Uchar | Short | Ushort | Int | Uint ->
+          let get_int = Type.int_accessor_exn type_ in
+          let a = Array.create ~len 0 in
+          let extract ic ~row_start i =
+            let base = Input.base ic in
+            let field_start = row_start + offset in
+            let n = get_int base ~pos:field_start in
+            Array.set a i n
+          in
+          extract, (name, Column.Ints a))
+    in
+    let fns, cols = List.unzip @@ List.map ts ~f:create_column in
+    List.to_array fns, Map.of_alist_exn (module String) cols
   ;;
 end
 
@@ -189,30 +200,41 @@ module Element = struct
     }
   [@@deriving sexp_of]
 
-  let name t = t.name
-  let count t = t.count
-  let properties t = t.properties
   let create ~name ~count properties = { name; count; properties }
 
   let fixed_width_parser t ~width ic =
     let ps = t.properties in
-    let extractors, values = List.unzip @@ Property.create_values ps ~len:t.count in
-    let values = Map.of_alist_exn (module String) values in
+    let extractors, columns = Property.create_columns ps ~len:t.count in
     for i = 0 to t.count - 1 do
       let row_start = width * i in
-      List.iter extractors ~f:(fun extract -> extract ic ~row_start i)
+      Array.iter extractors ~f:(fun extract -> extract ic ~row_start i)
     done;
-    t.name, values
+    Input.advance ic (width * t.count);
+    t.name, columns
   ;;
 
-  let list_parser ~length_type:_ ~elt_type:_ ~name (_ : Input.t) =
-    name, Map.empty (module String)
+  let list_parser ~count ~length_type ~elt_type ~name (ic : Input.t) =
+    let get_len = Type.int_accessor_exn length_type in
+    let get_elt = Type.int_accessor_exn elt_type in
+    let len_size = Type.size length_type in
+    let elt_size = Type.size elt_type in
+    let (rows : int array array) = Array.create ~len:count [||] in
+    let base = Input.base ic in
+    let offset = ref @@ Input.pos ic in
+    for i = 0 to count - 1 do
+      let len = get_len base ~pos:!offset in
+      offset := !offset + len_size;
+      rows.(i)
+        <- Array.init len ~f:(fun i -> get_elt base ~pos:(!offset + (i * elt_size)));
+      offset := !offset + (len * elt_size)
+    done;
+    name, Map.singleton (module String) "rows" (Property.Column.Rows rows)
   ;;
 
   let parse t =
     match t.properties with
     | [ Property.List { length_type; elt_type; name } ] ->
-      list_parser ~length_type ~elt_type ~name
+      list_parser ~count:t.count ~length_type ~elt_type ~name
     | ps ->
       if List.for_all ps ~f:Property.is_atomic
       then (
@@ -275,16 +297,16 @@ module Header = struct
 end
 
 module Data = struct
+  module Column = Property.Column
+
   type t =
     ( string
-    , (string, Property.Values.t, String.comparator_witness) Map.t
+    , (string, Column.t, String.comparator_witness) Map.t
     , String.comparator_witness )
     Map.t
 
   let sexp_of_t =
-    Map.sexp_of_m__t
-      (module String)
-      (Map.sexp_of_m__t (module String) Property.Values.sexp_of_t)
+    Map.sexp_of_m__t (module String) (Map.sexp_of_m__t (module String) Column.sexp_of_t)
   ;;
 end
 
@@ -295,6 +317,7 @@ type t =
 [@@deriving sexp_of]
 
 let header t = t.header
+let data t = t.data
 
 let check_file_magic ic =
   if Input.length ic < 4

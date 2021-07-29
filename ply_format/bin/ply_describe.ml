@@ -4,7 +4,24 @@ open Ply_format
 module Bigstring = Base_bigstring
 
 let main ply =
-  printf "== PLY Summary ==\n{%s}\n" (ply |> [%sexp_of: Ply.t] |> Sexp.to_string_hum)
+  printf "== PLY Summary ==\n{%s}\n" (ply |> [%sexp_of: Ply.t] |> Sexp.to_string_hum);
+  let d = Ply.data ply in
+  match Map.find d "vertex_indices" with
+  | None -> failwith "ply data contains no vertex_indices property"
+  | Some inner_map ->
+    (match Map.find inner_map "rows" with
+    | None -> failwith "BUG: vertex_indices has no rows property"
+    | Some (Floats _) -> failwith "got Floats, expected Rows"
+    | Some (Ints _) -> failwith "got Ints, expected Rows"
+    | Some (Rows faces) ->
+      let h = Hashtbl.create (module Int) in
+      Array.iter faces ~f:(fun face ->
+          let face_size = Array.length face in
+          Hashtbl.update h face_size ~f:(function
+              | None -> 1
+              | Some n -> n + 1));
+      printf "== Face sizes ==\n";
+      Hashtbl.iteri h ~f:(fun ~key:size ~data:count -> printf "%d-gons: %d\n" size count))
 ;;
 
 let () =
