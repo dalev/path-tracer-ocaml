@@ -84,6 +84,22 @@ module Type = struct
     | Int | Uint | Float -> 4
     | Double -> 8
   ;;
+
+  let float_accessor_exn = function
+    | Float -> fun base ~pos -> Int32.float_of_bits @@ Bigstringaf.get_int32_le base pos
+    | Double -> fun base ~pos -> Int64.float_of_bits @@ Bigstringaf.get_int64_le base pos
+    | ty -> raise_s [%message "expected Float|Double" ~type_:(ty : t)]
+  ;;
+
+  let int_accessor_exn = function
+    | Char -> Bigstring.get_int8
+    | Uchar -> Bigstring.get_uint8
+    | Short -> Bigstring.get_int8
+    | Ushort -> Bigstring.get_uint8
+    | Int -> Bigstring.get_int32_le
+    | Uint -> Bigstring.get_uint32_le
+    | ty -> raise_s [%message "expected integer type" ~type_:(ty : t)]
+  ;;
 end
 
 module Property = struct
@@ -122,10 +138,13 @@ module Property = struct
   ;;
 
   module Values = struct
-    type t = Floats of floatarray
+    type t =
+      | Floats of floatarray
+      | Ints of int array
 
     let sexp_of_t = function
       | Floats fs -> [%message "floatarray" ~length:(Caml.Float.Array.length fs : int)]
+      | Ints is -> [%message "int array" ~length:(Array.length is : int)]
     ;;
   end
 
@@ -139,16 +158,26 @@ module Property = struct
           let offset = !field_offset in
           field_offset := !field_offset + size;
           (match (type_ : Type.t) with
-          | Float ->
+          | Float | Double ->
+            let get_float = Type.float_accessor_exn type_ in
             let a = Caml.Float.Array.create len in
             let extract ic ~row_start i =
               let base = Input.base ic in
               let field_start = row_start + offset in
-              let n = Int32.float_of_bits @@ Bigstringaf.get_int32_le base field_start in
+              let n = get_float base ~pos:field_start in
               Caml.Float.Array.set a i n
             in
             extract, (name, Values.Floats a)
-          | _ -> assert false))
+          | Char | Uchar | Short | Ushort | Int | Uint ->
+            let get_int = Type.int_accessor_exn type_ in
+            let a = Array.create ~len 0 in
+            let extract ic ~row_start i =
+              let base = Input.base ic in
+              let field_start = row_start + offset in
+              let n = get_int base ~pos:field_start in
+              Array.set a i n
+            in
+            extract, (name, Values.Ints a)))
   ;;
 end
 
@@ -165,10 +194,31 @@ module Element = struct
   let properties t = t.properties
   let create ~name ~count properties = { name; count; properties }
 
-  let width t =
-    if List.for_all t.properties ~f:Property.is_atomic
-    then `Fixed (List.sum (module Int) t.properties ~f:Property.size_exn)
-    else `Variable
+  let fixed_width_parser t ~width ic =
+    let ps = t.properties in
+    let extractors, values = List.unzip @@ Property.create_values ps ~len:t.count in
+    let values = Map.of_alist_exn (module String) values in
+    for i = 0 to t.count - 1 do
+      let row_start = width * i in
+      List.iter extractors ~f:(fun extract -> extract ic ~row_start i)
+    done;
+    t.name, values
+  ;;
+
+  let list_parser ~length_type:_ ~elt_type:_ ~name (_ : Input.t) =
+    name, Map.empty (module String)
+  ;;
+
+  let parse t =
+    match t.properties with
+    | [ Property.List { length_type; elt_type; name } ] ->
+      list_parser ~length_type ~elt_type ~name
+    | ps ->
+      if List.for_all ps ~f:Property.is_atomic
+      then (
+        let width = List.sum (module Int) t.properties ~f:Property.size_exn in
+        fixed_width_parser t ~width)
+      else failwith "TO DO: parse mixed list/non-list element"
   ;;
 end
 
@@ -257,21 +307,7 @@ let check_file_magic ic =
 ;;
 
 let read_binary_le h ic =
-  let read_element e =
-    let name = Element.name e in
-    let count = Element.count e in
-    let ps = Element.properties e in
-    match Element.width e with
-    | `Fixed width ->
-      let extractors, values = List.unzip @@ Property.create_values ps ~len:count in
-      let values = Map.of_alist_exn (module String) values in
-      for i = 0 to count - 1 do
-        let row_start = width * i in
-        List.iter extractors ~f:(fun extract -> extract ic ~row_start i)
-      done;
-      name, values
-    | `Variable -> name, Map.empty (module String)
-  in
+  let read_element e = Element.parse e ic in
   Ok (List.map (Header.elements h) ~f:read_element)
 ;;
 
