@@ -20,11 +20,12 @@ let main ply =
           Hashtbl.update h face_size ~f:(function
               | None -> 1
               | Some n -> n + 1));
-      printf "== Face sizes ==\n";
+      printf "\n== Face sizes ==\n";
       Hashtbl.iteri h ~f:(fun ~key:size ~data:count -> printf "%d-gons: %d\n" size count))
 ;;
 
 let () =
+  let start = Time_now.nanoseconds_since_unix_epoch () in
   let argv = Sys.get_argv () in
   if Array.length argv <> 2 then failwith "expected argument: path to .ply file";
   let shared = false in
@@ -35,5 +36,9 @@ let () =
   in
   let ply = Ply.of_bigstring bs in
   Unix.close fd;
-  main (Or_error.ok_exn ply)
+  main (Or_error.ok_exn ply);
+  let elapsed_ns =
+    Float.of_int63 @@ Int63.O.(Time_now.nanoseconds_since_unix_epoch () - start)
+  in
+  printf "\nFinished in %s ms\n" (Float.to_string_hum @@ (elapsed_ns *. 1e-6))
 ;;
