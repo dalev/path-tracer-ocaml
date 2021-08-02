@@ -108,6 +108,7 @@ unsafe fn spheres_intersect_aux(
     let mut t_hits = [0.0; LEAF_SIZE];
     let d_quadrance = d.quadrance();
     let a = _mm256_set1_pd(d_quadrance);
+    let one_over_a = _mm256_div_pd(_mm256_set1_pd(1.0), a);
     let ox = _mm256_set1_pd(o.x);
     let oy = _mm256_set1_pd(o.y);
     let oz = _mm256_set1_pd(o.z);
@@ -133,7 +134,6 @@ unsafe fn spheres_intersect_aux(
         let c = _mm256_sub_pd(simd::quadrance(fx, fy, fz), r2);
         // bp = dot(f, d)
         let bp = simd::dot4(fx, fy, fz, dx, dy, dz);
-        let one_over_a = _mm256_div_pd(_mm256_set1_pd(1.0), a);
         let bp_over_a = _mm256_mul_pd(bp, one_over_a);
         // let w = d.scale(bp / a) - f
         let wx = _mm256_fmsub_pd(dx, bp_over_a, fx);
