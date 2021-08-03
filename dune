@@ -5,5 +5,5 @@
   (ocamlopt_flags
    (:standard
     ; -dump-into-file -dcmm
-    -nodynlink
+    ; -nodynlink
     -O2))))

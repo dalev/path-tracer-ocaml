@@ -1,5 +1,4 @@
 (executable
  (name ply_describe)
  (libraries base base_bigstring stdio unix ply_format)
- (preprocess
-  (pps ppx_base)))
+ (preprocess (pps ppx_base)))
