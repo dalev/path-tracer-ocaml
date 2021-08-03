@@ -6,6 +6,7 @@
  (github dalev/path-tracer-ocaml))
 
 (authors "Dale Vaillancourt")
+(maintainers "dalev@alum.wpi.edu")
 
 (package
  (name path_tracer)
@@ -36,6 +37,12 @@
    (and
     :with-test
     (>= "1.4")))
+  (ocaml
+   (>= 4.12))))
+
+(package
+ (name ply_format)
+ (depends
   (ocaml
    (>= 4.12))))
 
