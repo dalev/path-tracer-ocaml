@@ -10,14 +10,22 @@
 (package
  (name path_tracer)
  (depends
+  (stdio
+   (>= v0.14.0))
+  (progress
+   (>= 0.2.1))
+  (ppx_base
+   (>= v0.14.0))
+  (bimage-io
+   (>= 0.4.0))
+  (bimage
+   (>= 0.4.0))
   (alcotest
    (and
     :with-test
     (>= "1.4")))
   (base
    (>= 0.14.1))
-  (lwt
-   (>= 5.4.1))
   (ocaml
    (>= 4.12))))
 

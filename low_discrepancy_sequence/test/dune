@@ -1,3 +1,4 @@
 (test
+ (package low_discrepancy_sequence)
  (name low_discrepancy_sequence_test)
  (libraries low_discrepancy_sequence alcotest))

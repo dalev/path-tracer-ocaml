@@ -1,2 +1,3 @@
 (library
+ (package low_discrepancy_sequence)
  (name low_discrepancy_sequence))
