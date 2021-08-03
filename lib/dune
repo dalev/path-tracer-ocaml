@@ -1,3 +1,4 @@
 (library
+ (package path_tracer)
  (name path_tracer)
  (libraries base low_discrepancy_sequence))
