@@ -9,6 +9,7 @@ crate-type = ["staticlib", "cdylib"]
 
 [profile.release]
 panic = "abort"
+lto = true
 
 [dependencies]
 ocaml-sys = "0.22"
