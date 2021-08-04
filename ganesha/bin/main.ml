@@ -297,7 +297,7 @@ let main args =
   printf "#triangles = %d\n%!" (List.length triangles);
   let elapsed, tree = with_elapsed_time (fun () -> Triangles.create triangles) in
   printf
-    "tree depth = %d\nbuild time = %.3f\n%!"
+    "tree depth = %d\nbuild time = %.3f ms\n%!"
     (Triangles.depth tree)
     (Float.of_int63 elapsed *. 1e-6);
   printf
