@@ -304,6 +304,7 @@ let main args =
     "leaf lengths =\n%s\n%!"
     (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree));
   let ganesha_material =
+    (* we don't support texture mapping yet, so just hard-coding this to green *)
     Material.lambertian (Texture.solid (Color.create ~r:0.0 ~g:0.7 ~b:0.1))
   in
   let i =
