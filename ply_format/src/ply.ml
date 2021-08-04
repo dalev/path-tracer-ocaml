@@ -1,5 +1,6 @@
 open! Base
 module Bigstring = Base_bigstring
+module Bigsubstring = Core_kernel.Bigsubstring
 
 let ( let* ) m f = Or_error.bind m ~f
 let error_s = Or_error.error_s
@@ -17,36 +18,34 @@ module Input : sig
   val base : t -> Bigstring.t
   val pos : t -> int
 end = struct
-  type t =
-    { buf : Bigstring.t
-    ; mutable pos : int
-    }
+  type t = { mutable buf : Bigsubstring.t }
 
-  let base t = t.buf
-  let pos t = t.pos
-  let advance t count = t.pos <- t.pos + count
+  let base t = Bigsubstring.base t.buf
+  let pos t = Bigsubstring.pos t.buf
+  let advance t count = t.buf <- Bigsubstring.drop_prefix t.buf count
 
   let take t ~len =
-    let prefix = Bigstring.To_string.sub t.buf ~pos:t.pos ~len in
-    t.pos <- t.pos + len;
-    prefix
+    let prefix = Bigsubstring.prefix t.buf len in
+    t.buf <- Bigsubstring.drop_prefix t.buf len;
+    Bigsubstring.to_string prefix
   ;;
 
-  let create buf = { buf; pos = 0 }
-  let length t = Bigstring.length t.buf - t.pos
+  let create buf = { buf = Bigsubstring.create buf }
+  let length t = Bigsubstring.length t.buf
 
   let read_line t =
-    let base = t.buf in
-    let pos = t.pos in
+    let base = base t in
+    let pos = pos t in
     let len = length t in
     match Bigstring.find '\n' base ~pos ~len with
     | None ->
-      t.pos <- pos + len;
-      Some (Bigstring.To_string.sub t.buf ~pos ~len)
+      t.buf <- Bigsubstring.create (Bigstring.create 0);
+      Some (Bigsubstring.to_string t.buf)
     | Some nl_idx ->
-      let len = nl_idx - pos in
-      t.pos <- nl_idx + 1;
-      Some (Bigstring.To_string.sub t.buf ~pos ~len)
+      let line_len = nl_idx - pos in
+      let line = Bigsubstring.prefix t.buf line_len in
+      t.buf <- Bigsubstring.drop_prefix t.buf (line_len + 1);
+      Some (Bigsubstring.to_string line)
   ;;
 end
 
@@ -175,7 +174,7 @@ module Property = struct
           let a = Caml.Float.Array.create len in
           let extract ic ~row_start i =
             let base = Input.base ic in
-            let field_start = row_start + offset in
+            let field_start = Input.pos ic + row_start + offset in
             let n = get_float base ~pos:field_start in
             Caml.Float.Array.set a i n
           in
@@ -185,7 +184,7 @@ module Property = struct
           let a = Array.create ~len 0 in
           let extract ic ~row_start i =
             let base = Input.base ic in
-            let field_start = row_start + offset in
+            let field_start = Input.pos ic + row_start + offset in
             let n = get_int base ~pos:field_start in
             Array.set a i n
           in
