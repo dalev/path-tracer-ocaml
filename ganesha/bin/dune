@@ -1,0 +1,7 @@
+(executable
+ (package path_tracer)
+ (name main)
+ (public_name ganesha)
+ (preprocess
+  (pps ppx_base))
+ (libraries path_tracer ply_format base stdio bimage bimage-io progress))
