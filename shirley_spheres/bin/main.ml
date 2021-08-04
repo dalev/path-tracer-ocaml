@@ -137,16 +137,18 @@ let background =
     Color.lerp t Color.white escape_color
 ;;
 
-module type Leaf_S = Skd_tree.Leaf with type elt = Sphere.t
+module type Leaf_S =
+  Skd_tree.Leaf with type elt = Sphere.t and type elt_hit = float * Sphere.t
 
 module Array_leaf : Leaf_S = struct
   type t = Sphere.t array
   type elt = Sphere.t
+  type elt_hit = float * elt
 
+  let elt_hit_t = fst
   let length_cutoff = 8
   let of_elts = Fn.id
   let elt_bbox = Sphere.bbox
-  let hit = Sphere.hit
   let depth _ = 0
   let length = Array.length
 
@@ -186,6 +188,9 @@ module Simd_leaf : Leaf_S = struct
     }
 
   type elt = Sphere.t
+  type elt_hit = float * elt
+
+  let elt_hit_t = fst
 
   (* [float_ref]'s [float_contents] is unboxed (whereas the contents of [float ref] is boxed) *)
   type float_ref = { mutable float_contents : float }
@@ -207,7 +212,6 @@ module Simd_leaf : Leaf_S = struct
   external leaf_size : unit -> int = "leaf_size"
 
   let elt_bbox = Sphere.bbox
-  let hit = Sphere.hit
   let length_cutoff = leaf_size ()
 
   let of_elts elts =
@@ -253,7 +257,8 @@ module Simd_leaf : Leaf_S = struct
   ;;
 end
 
-module type Spheres_S = Skd_tree.S with type elt := Sphere.t
+module type Spheres_S =
+  Skd_tree.S with type elt := Sphere.t and type elt_hit := float * Sphere.t
 
 let main args =
   let { Args.width; height; spp; output; no_progress; max_bounces; no_simd } = args in
@@ -302,7 +307,11 @@ let main args =
     "leaf lengths =\n%s\n%!"
     (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree));
   let i =
-    let intersect r = Spheres.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value in
+    let intersect r =
+      match Spheres.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value with
+      | None -> None
+      | Some (t_hit, sphere) -> Some (Sphere.hit sphere t_hit r)
+    in
     Integrator.create
       ~width
       ~height

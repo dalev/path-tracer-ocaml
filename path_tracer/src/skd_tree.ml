@@ -8,7 +8,7 @@ end
 
 include Skd_tree_intf
 
-module Make (L : Leaf) : S with type elt := L.elt = struct
+module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit = struct
   module Bshape = struct
     type t =
       { shape : L.elt
@@ -89,7 +89,9 @@ module Make (L : Leaf) : S with type elt := L.elt = struct
         match t with
         | Leaf l ->
           (match L.intersect l ray ~t_min:t_enter ~t_max:t_found with
-          | Some (t_hit, elt_hit) -> k t_hit (Some elt_hit)
+          | Some elt_hit as some_elt_hit ->
+            let t_hit = L.elt_hit_t elt_hit in
+            k t_hit some_elt_hit
           | None -> k t_found found)
         | Branch { to_axis; lhs_clip; rhs_clip; lhs; rhs } ->
           let t_lhs = solve_ray_plane to_axis lhs_clip in
@@ -112,11 +114,7 @@ module Make (L : Leaf) : S with type elt := L.elt = struct
             loop subtree1 found t_found t_enter t_leave k)
           else k t_found found)
     in
-    let k0 t_hit found =
-      match found with
-      | None -> None
-      | Some item -> Some (L.hit item t_hit ray)
-    in
+    let k0 (_t_hit : float) found = found in
     loop t None t_leave t_enter t_leave k0
   ;;
 

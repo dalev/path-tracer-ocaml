@@ -4,6 +4,7 @@ type t =
   { min : P3.t
   ; max : P3.t
   }
+[@@deriving sexp_of]
 
 let create ~min ~max = { min; max }
 let min t = t.min

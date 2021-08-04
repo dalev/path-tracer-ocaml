@@ -1,4 +1,4 @@
-type t
+type t [@@deriving sexp_of]
 
 val create : min:P3.t -> max:P3.t -> t
 val is_hit : t -> Ray.t -> t_min:float -> t_max:float -> bool
