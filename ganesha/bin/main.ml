@@ -1,4 +1,5 @@
-open! Core
+open Base
+open Stdio
 open Path_tracer
 open Ply_format
 module Bigstring = Base_bigstring
@@ -96,15 +97,17 @@ module Mesh = struct
       | Some (Rows faces) -> faces
     in
     let f = Fn.compose floats_exn (Map.find_exn v) in
+    let fst3 (a, _, _) = a in
+    let map3 (a, b, c) ~f = f a, f b, f c in
     let flds = "x", "y", "z" in
-    let xyzs' = Tuple3.map flds ~f in
-    let lengths = Tuple3.map xyzs' ~f:FArray.length in
+    let xyzs' = map3 flds ~f in
+    let lengths = map3 xyzs' ~f:FArray.length in
     (let lx, ly, lz = lengths in
      assert (lx = ly);
      assert (ly = lz));
-    let xs, ys, zs = Tuple3.map lengths ~f:FArray.create in
-    for i = 0 to Tuple3.get1 lengths - 1 do
-      let xyz = P3.of_tuple @@ Tuple3.map xyzs' ~f:(Fn.flip FArray.get i) in
+    let xs, ys, zs = map3 lengths ~f:FArray.create in
+    for i = 0 to fst3 lengths - 1 do
+      let xyz = P3.of_tuple @@ map3 xyzs' ~f:(Fn.flip FArray.get i) in
       let p = Camera.transform camera xyz in
       FArray.set xs i (P3.x p);
       FArray.set ys i (P3.y p);
@@ -224,10 +227,10 @@ end
 
 let load_ply_exn path =
   let shared = false in
-  let fd = Unix.openfile path ~mode:[ O_RDONLY ] in
+  let fd = Unix.openfile path [ O_RDONLY ] 0o600 in
   let (bs : Bigstring.t) =
     Bigarray.array1_of_genarray
-    @@ Unix.map_file fd Bigarray.char Bigarray.c_layout ~shared [| -1 |]
+    @@ Unix.map_file fd Bigarray.char Bigarray.c_layout shared [| -1 |]
   in
   let ply = Ply.of_bigstring bs in
   Unix.close fd;
@@ -235,9 +238,10 @@ let load_ply_exn path =
 ;;
 
 let with_elapsed_time f =
-  let start = Time_ns.now () in
+  let start = Time_now.nanoseconds_since_unix_epoch () in
   let x = f () in
-  let elapsed = Time_ns.diff (Time_ns.now ()) start in
+  let stop = Time_now.nanoseconds_since_unix_epoch () in
+  let elapsed = Int63.(stop - start) in
   elapsed, x
 ;;
 
@@ -293,9 +297,9 @@ let main args =
   printf "#triangles = %d\n%!" (List.length triangles);
   let elapsed, tree = with_elapsed_time (fun () -> Triangles.create triangles) in
   printf
-    "tree depth = %d\nbuild time = %s\n%!"
+    "tree depth = %d\nbuild time = %.3f\n%!"
     (Triangles.depth tree)
-    (Time_ns.Span.to_string_hum elapsed);
+    (Float.of_int63 elapsed *. 1e-6);
   printf
     "leaf lengths =\n%s\n%!"
     (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree));
