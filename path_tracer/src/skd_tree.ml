@@ -1,11 +1,4 @@
 open Base
-
-module Array = struct
-  include Array
-
-  let split_at a n = partitioni_tf a ~f:(fun i _ -> i < n)
-end
-
 include Skd_tree_intf
 
 module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit = struct
@@ -158,7 +151,7 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
     ;;
   end
 
-  let join_bins = Array.reduce_exn ~f:Bin.join
+  let join_bins = Slice.reduce_exn ~f:Bin.join
   let num_bins = 32
   let costI = 1.0
   let costT = 0.25
@@ -181,8 +174,9 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
         Array.filter_map bins ~f:Bin.bbox |> Array.reduce_exn ~f:Bbox.union
       in
       let total_area = Bbox.surface_area total_bbox in
+      let bins = Slice.create bins in
       List.init (num_bins - 1) ~f:(fun p ->
-          let lhs, rhs = Array.split_at bins (p + 1) in
+          let lhs, rhs = Slice.split_at bins (p + 1) in
           let f = Fn.compose Bin.scaled_area join_bins in
           match f lhs, f rhs with
           | None, _ | _, None -> None

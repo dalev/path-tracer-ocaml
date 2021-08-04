@@ -1,5 +1,4 @@
-open! Base
-open Stdio
+open! Core
 open Path_tracer
 open Ply_format
 module Bigstring = Base_bigstring
@@ -229,14 +228,21 @@ end
 
 let load_ply_exn path =
   let shared = false in
-  let fd = Unix.openfile path [ Unix.O_RDONLY ] 0o600 in
+  let fd = Unix.openfile path ~mode:[ O_RDONLY ] in
   let (bs : Bigstring.t) =
     Bigarray.array1_of_genarray
-    @@ Unix.map_file fd Bigarray.char Bigarray.c_layout shared [| -1 |]
+    @@ Unix.map_file fd Bigarray.char Bigarray.c_layout ~shared [| -1 |]
   in
   let ply = Ply.of_bigstring bs in
   Unix.close fd;
   Or_error.ok_exn ply
+;;
+
+let with_elapsed_time f =
+  let start = Time_ns.now () in
+  let x = f () in
+  let elapsed = Time_ns.diff (Time_ns.now ()) start in
+  elapsed, x
 ;;
 
 let main args =
@@ -289,8 +295,11 @@ let main args =
   let triangles : Triangle.t list = List.init (Array.length mesh.Mesh.faces) ~f:Fn.id in
   printf "dim = %d x %d;\n" width height;
   printf "#triangles = %d\n%!" (List.length triangles);
-  let tree = Triangles.create triangles in
-  printf "tree depth = %d\n%!" (Triangles.depth tree);
+  let elapsed, tree = with_elapsed_time (fun () -> Triangles.create triangles) in
+  printf
+    "tree depth = %d\nbuild time = %s\n%!"
+    (Triangles.depth tree)
+    (Time_ns.Span.to_string_hum elapsed);
   printf
     "leaf lengths =\n%s\n%!"
     (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree));

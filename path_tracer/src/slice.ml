@@ -31,6 +31,8 @@ let map_reduce t ~transform ~combine =
   fold_from t ~init ~offset:1 ~f:(fun acc item -> combine acc (transform item))
 ;;
 
+let reduce_exn t ~f = map_reduce t ~transform:Fn.id ~combine:f
+
 let split_at t i =
   assert (i < t.length);
   let lhs = { t with length = i } in
