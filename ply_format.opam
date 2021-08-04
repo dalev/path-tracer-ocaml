@@ -6,6 +6,8 @@ homepage: "https://github.com/dalev/path-tracer-ocaml"
 bug-reports: "https://github.com/dalev/path-tracer-ocaml/issues"
 depends: [
   "dune" {>= "2.9"}
+  "alcotest" {>= "1.4.0" & with-test}
+  "core_kernel" {>= "v0.14.1"}
   "ppx_sexp_message" {>= "v0.14.1"}
   "ppx_base" {>= "v0.14.0"}
   "parsexp" {>= "v0.14.1"}

@@ -6,6 +6,7 @@
 (package
  (name path_tracer)
  (depends
+  (core (>= v0.14.1))
   (stdio (>= v0.14.0))
   (progress (>= 0.2.1))
   (ppx_base (>= v0.14.0))
@@ -20,6 +21,8 @@
 (package
  (name ply_format)
  (depends
+  (alcotest (and (>= 1.4.0) :with-test))
+  (core_kernel (>= v0.14.1))
   (ppx_sexp_message (>= v0.14.1))
   (ppx_base (>= v0.14.0))
   (parsexp (>= v0.14.1))
