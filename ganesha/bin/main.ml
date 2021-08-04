@@ -96,20 +96,16 @@ module Mesh = struct
       | Some (Rows faces) -> faces
     in
     let f = Fn.compose floats_exn (Map.find_exn v) in
-    let xs' = f "x" in
-    let ys' = f "y" in
-    let zs' = f "z" in
-    let len = FArray.length xs' in
-    assert (len = FArray.length ys');
-    assert (len = FArray.length zs');
-    let xs = FArray.create len in
-    let ys = FArray.create len in
-    let zs = FArray.create len in
-    for i = 0 to len - 1 do
-      let x = FArray.get xs' i in
-      let y = FArray.get ys' i in
-      let z = FArray.get zs' i in
-      let p = Camera.transform camera @@ P3.create ~x ~y ~z in
+    let flds = "x", "y", "z" in
+    let xyzs' = Tuple3.map flds ~f in
+    let lengths = Tuple3.map xyzs' ~f:FArray.length in
+    (let lx, ly, lz = lengths in
+     assert (lx = ly);
+     assert (ly = lz));
+    let xs, ys, zs = Tuple3.map lengths ~f:FArray.create in
+    for i = 0 to Tuple3.get1 lengths - 1 do
+      let xyz = P3.of_tuple @@ Tuple3.map xyzs' ~f:(Fn.flip FArray.get i) in
+      let p = Camera.transform camera xyz in
       FArray.set xs i (P3.x p);
       FArray.set ys i (P3.y p);
       FArray.set zs i (P3.z p)

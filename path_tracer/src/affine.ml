@@ -15,6 +15,7 @@ module V3 = struct
   let pp = pp
   let create ~x ~y ~z : t = { x; y; z }
   let coords { x; y; z } = x, y, z
+  let of_tuple (x, y, z) = { x; y; z }
   let x t = t.x
   let y t = t.y
   let z t = t.z
