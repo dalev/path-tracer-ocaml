@@ -1,0 +1,1 @@
+To render this model, you'll need a copy of the ganesha model from [PBRT V3 Scenes](https://pbrt.org/scenes-v3).  The `-ganesha-ply` command-line argument should point to `<scene-repo>/ganesha/geometry/ganesha.ply`.
