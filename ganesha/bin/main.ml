@@ -232,9 +232,9 @@ let load_ply_exn path =
     Bigarray.array1_of_genarray
     @@ Unix.map_file fd Bigarray.char Bigarray.c_layout shared [| -1 |]
   in
-  let ply = Ply.of_bigstring bs in
-  Unix.close fd;
-  Or_error.ok_exn ply
+  Exn.protect
+    ~f:(fun () -> Or_error.ok_exn @@ Ply.of_bigstring bs)
+    ~finally:(fun () -> Unix.close fd)
 ;;
 
 let with_elapsed_time f =
