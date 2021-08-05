@@ -175,9 +175,9 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
       in
       let total_area = Bbox.surface_area total_bbox in
       let bins = Slice.create bins in
+      let f = Fn.compose Bin.scaled_area join_bins in
       List.init (num_bins - 1) ~f:(fun p ->
           let lhs, rhs = Slice.split_at bins (p + 1) in
-          let f = Fn.compose Bin.scaled_area join_bins in
           match f lhs, f rhs with
           | None, _ | _, None -> None
           | Some lhs_area, Some rhs_area ->
