@@ -47,7 +47,6 @@ type t =
   ; write_pixel : x:int -> y:int -> Color.t -> unit
   ; samples_per_pixel : int
   ; max_bounces : int
-  ; camera : Camera.t
   ; trace_path :
       cx:float -> cy:float -> int -> Low_discrepancy_sequence.Sample.t -> Color.t
   ; tiles : Tile.t list
@@ -127,15 +126,7 @@ let create
   in
   let max_area = 32 * 32 in
   let tiles = Tile.split ~max_area (Tile.create ~width ~height) in
-  { width
-  ; height
-  ; write_pixel
-  ; samples_per_pixel
-  ; max_bounces
-  ; camera
-  ; trace_path
-  ; tiles
-  }
+  { width; height; write_pixel; samples_per_pixel; max_bounces; trace_path; tiles }
 ;;
 
 let gamma = Color.map ~f:Float.sqrt
