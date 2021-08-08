@@ -31,18 +31,18 @@ module V3 = struct
     | Z -> z
   ;;
 
-  let map { x; y; z } ~f = { x = f x; y = f y; z = f z }
-  let map2 a b ~f = { x = f a.x b.x; y = f a.y b.y; z = f a.z b.z }
+  let[@inline] map { x; y; z } ~f = { x = f x; y = f y; z = f z }
+  let[@inline] map2 a b ~f = { x = f a.x b.x; y = f a.y b.y; z = f a.z b.z }
   let of_float a = { x = a; y = a; z = a }
   let zero = of_float 0.0
   let one = of_float 1.0
 
   module Infix = struct
-    let ( + ) = map2 ~f:( +. )
-    let ( - ) = map2 ~f:( -. )
-    let ( * ) = map2 ~f:( *. )
-    let ( / ) = map2 ~f:( /. )
-    let ( ~- ) = map ~f:( ~-. )
+    let ( + ) a b = map2 ~f:( +. ) a b
+    let ( - ) a b = map2 ~f:( -. ) a b
+    let ( * ) a b = map2 ~f:( *. ) a b
+    let ( / ) a b = map2 ~f:( /. ) a b
+    let ( ~- ) a = map ~f:( ~-. ) a
   end
 
   let of_points ~src ~tgt = Infix.( - ) tgt src

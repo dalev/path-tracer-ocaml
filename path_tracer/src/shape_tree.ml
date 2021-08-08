@@ -1,8 +1,6 @@
 open Base
 include Shape_tree_intf
 
-let num_bins = 32
-
 module Bshape = struct
   type 'a t =
     { shape : 'a
@@ -26,12 +24,17 @@ end
 
 module Bin = struct
   type t =
-    { count : int
-    ; bounds : Bbox.t option
+    { mutable count : int
+    ; mutable bounds : Bbox.t option
+    ; mutable bbox_l : Bbox.t option
+    ; mutable bbox_r : Bbox.t option
     }
 
-  let create () = { count = 0; bounds = None }
+  let create () = { count = 0; bounds = None; bbox_l = None; bbox_r = None }
   let bbox t = t.bounds
+  let bbox_l t = t.bbox_l
+  let bbox_r t = t.bbox_r
+  let count t = t.count
 
   let insert t b =
     let b_box = Bshape.bbox b in
@@ -41,17 +44,27 @@ module Bin = struct
         | None -> b_box
         | Some t_box -> Bbox.union t_box b_box)
     in
-    { count = t.count + 1; bounds }
+    t.bounds <- bounds;
+    t.count <- t.count + 1
   ;;
 
-  let join_bounds t t' = Bbox.union_opt t.bounds t'.bounds
-
-  let join t t' =
-    let bounds = join_bounds t t' in
-    { count = t.count + t'.count; bounds }
+  let populate_bbox_r bins =
+    let last_bin = Array.last bins in
+    last_bin.bbox_r <- bbox last_bin;
+    for j = Array.length bins - 2 downto 0 do
+      let bin_j = bins.(j) in
+      bin_j.bbox_r <- Bbox.union_opt (bbox bin_j) (bbox_r bins.(j + 1))
+    done
   ;;
 
-  let join_slice = Slice.reduce_exn ~f:join
+  let populate_bbox_l bins =
+    let first_bin = bins.(0) in
+    first_bin.bbox_l <- bbox first_bin;
+    for j = 1 to Array.length bins - 1 do
+      let bin_j = bins.(j) in
+      bin_j.bbox_l <- Bbox.union_opt (bbox bin_j) (bbox_l bins.(j - 1))
+    done
+  ;;
 end
 
 module Proposal = struct
@@ -75,19 +88,27 @@ module Proposal = struct
 
   let candidates bins to_bin axis =
     let total_bbox =
-      Array.filter_map bins ~f:Bin.bbox |> Array.reduce_exn ~f:Bbox.union
+      match Bin.bbox_l (Array.last bins) with
+      | None -> failwith "BUG: candidates: bbox_l is not populated"
+      | Some b -> b
     in
     let total_area = Bbox.surface_area total_bbox in
-    let bins = Slice.create bins in
-    List.init (num_bins - 1) ~f:(fun p ->
-        let lhs, rhs = Slice.split_at bins (p + 1) in
-        let lhs = Bin.join_slice lhs in
-        let rhs = Bin.join_slice rhs in
-        match Bin.bbox lhs, Bin.bbox rhs with
+    let total_count = Array.sum (module Int) bins ~f:Bin.count in
+    (* subtlety: List.init runs 'backwards', this mutable state maintenance is sensitive to that *)
+    let n_right = ref 0 in
+    List.init
+      (Array.length bins - 1)
+      ~f:(fun p ->
+        let lhs = bins.(p) in
+        let rhs = bins.(p + 1) in
+        let rhs_count = !n_right + Bin.count rhs in
+        let lhs_count = total_count - rhs_count in
+        n_right := rhs_count;
+        match Bin.bbox_l lhs, Bin.bbox_r rhs with
         | None, _ | _, None -> None
         | Some lhs_box, Some rhs_box ->
-          let lhs_area = Float.of_int lhs.Bin.count *. Bbox.surface_area lhs_box in
-          let rhs_area = Float.of_int rhs.Bin.count *. Bbox.surface_area rhs_box in
+          let lhs_area = Float.of_int lhs_count *. Bbox.surface_area lhs_box in
+          let rhs_area = Float.of_int rhs_count *. Bbox.surface_area rhs_box in
           let on_lhs b = to_bin b <= p in
           let open Float.O in
           let cost = costT + ((lhs_area + rhs_area) * costI / total_area) in
@@ -98,6 +119,7 @@ module Proposal = struct
   let compare p1 p2 = Float.compare (cost p1) (cost p2)
 
   let propose_split_one_axis shapes axis cbox =
+    let num_bins = 32 in
     let to_axis = P3.axis axis in
     let to_bin =
       let epsilon = 1e-6 in
@@ -107,10 +129,9 @@ module Proposal = struct
       fun b -> Float.to_int (scale *. (to_axis (Bshape.centroid b) -. cb_min))
     in
     let bins = Array.init num_bins ~f:(fun (_ : int) -> Bin.create ()) in
-    Slice.iter shapes ~f:(fun s ->
-        let j = to_bin s in
-        let bin = bins.(j) in
-        bins.(j) <- Bin.insert bin s);
+    Slice.iter shapes ~f:(fun s -> Bin.insert bins.(to_bin s) s);
+    Bin.populate_bbox_r bins;
+    Bin.populate_bbox_l bins;
     candidates bins to_bin axis |> List.min_elt ~compare
   ;;
 
@@ -185,7 +206,7 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
           let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
           if t_min <= t_max then k @@ L.intersect l ray ~t_min ~t_max else k None
         | Branch { bbox; axis; lhs; rhs } ->
-          let t_min, t_max = (Bbox.hit_range [@inlined]) bbox ray ~t_min ~t_max in
+          let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
           if t_min > t_max
           then k None
           else (
@@ -220,7 +241,8 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
   let intersect t ray ~t_min ~t_max = Tree.intersect t.root ray ~t_min ~t_max
 
   let create elts =
-    if List.is_empty elts then failwith "Skd_tree.create: given empty list of shapes";
+    if List.is_empty elts
+    then failwith "Shape_tree.create: expected non-empty list of shapes";
     let elts =
       Sequence.of_list elts
       |> Sequence.map ~f:(Bshape.create L.elt_bbox)

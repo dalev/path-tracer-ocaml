@@ -12,8 +12,8 @@ let max t = t.max
 let center { min; max } = P3.scale P3.Infix.(min + max) 0.5
 
 let union t t' =
-  let min = P3.map2 ~f:Float.min t.min t'.min in
-  let max = P3.map2 ~f:Float.max t.max t'.max in
+  let min = P3.map2 t.min t'.min ~f:Float.min in
+  let max = P3.map2 t.max t'.max ~f:Float.max in
   create ~min ~max
 ;;
 

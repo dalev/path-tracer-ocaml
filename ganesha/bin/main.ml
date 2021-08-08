@@ -16,6 +16,7 @@ module Args = struct
     ; no_simd : bool
     ; max_bounces : int
     ; ganesha_ply : string
+    ; stop_after_bvh : bool
     }
 
   let parse () =
@@ -25,6 +26,7 @@ module Args = struct
     let file = ref "ganesha.png" in
     let no_progress = ref false in
     let no_simd = ref false in
+    let stop_after_bvh = ref false in
     let max_bounces = ref 4 in
     let ganesha_ply = ref "ganesha.ply" in
     let usage_msg =
@@ -39,6 +41,7 @@ module Args = struct
       ; "-no-progress", Set no_progress, "suppress progress monitor"
       ; "-max-bounces", Set_int max_bounces, "<integer> max ray bounces"
       ; "-ganesha-ply", Set_string ganesha_ply, "<file> path to ganesha.ply"
+      ; "-stop-after-bvh", Set stop_after_bvh, "stop after BVH build"
       ]
       (fun (_ : string) -> failwith "No anonymous arguments expected")
       usage_msg;
@@ -50,6 +53,7 @@ module Args = struct
     ; no_simd = !no_simd
     ; max_bounces = !max_bounces
     ; ganesha_ply = !ganesha_ply
+    ; stop_after_bvh = !stop_after_bvh
     }
   ;;
 end
@@ -254,6 +258,7 @@ let main args =
       ; max_bounces
       ; no_simd = _
       ; ganesha_ply
+      ; stop_after_bvh
       }
     =
     args
@@ -303,6 +308,10 @@ let main args =
   printf
     "leaf lengths =\n%s\n%!"
     (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree));
+  if stop_after_bvh
+  then (
+    printf "Stop after bvh build\n";
+    Caml.exit 0);
   let ganesha_material =
     (* we don't support texture mapping yet, so just hard-coding this to green *)
     Material.lambertian (Texture.solid (Color.create ~r:0.0 ~g:0.7 ~b:0.1))
