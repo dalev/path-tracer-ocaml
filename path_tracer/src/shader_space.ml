@@ -9,7 +9,7 @@ let epsilon = 1e-9
 
 let create normal origin =
   let open Float.O in
-  let x, y, z = V3.coords normal in
+  let { V3.x; y; z } = normal in
   let rotation =
     if z > 1.0 - epsilon
     then Quaternion.id
@@ -29,7 +29,7 @@ let rotate_inv t v =
 ;;
 
 let reflect (_ : t) v =
-  let x, y, z = V3.coords v in
+  let { V3.x; y; z } = v in
   let x = ~-.x in
   let y = ~-.y in
   V3.create ~x ~y ~z

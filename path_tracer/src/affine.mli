@@ -1,19 +1,25 @@
 open Base
 
-type p3
+type p3 =
+  { x : float
+  ; y : float
+  ; z : float
+  }
 
 module V3 : sig
-  type t
+  type t =
+    { x : float
+    ; y : float
+    ; z : float
+    }
 
   val pp : Caml.Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
   val create : x:float -> y:float -> z:float -> t
-  val coords : t -> float * float * float
   val x : t -> float
   val y : t -> float
   val z : t -> float
   val min_coord : t -> float
   val max_coord : t -> float
-  val yzx : t -> t
   val zero : t
   val one : t
   val unit_x : t
@@ -41,12 +47,14 @@ module V3 : sig
 end
 
 module P3 : sig
-  type t = p3
+  type t = p3 =
+    { x : float
+    ; y : float
+    ; z : float
+    }
 
   val pp : Caml.Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
   val create : x:float -> y:float -> z:float -> t
-  val coords : t -> float * float * float
-  val of_tuple : float * float * float -> t
   val axis : Axis.t -> t -> float
   val x : t -> float
   val y : t -> float

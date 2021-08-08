@@ -22,7 +22,7 @@ let normal t pt = V3.normalize @@ V3.of_points ~src:t.center ~tgt:pt
 
 let tex_coord (_ : t) normal =
   let open Float.O in
-  let x, y, z = V3.coords normal in
+  let { V3.x; y; z } = normal in
   let theta = Float.acos (-y) in
   let phi = Float.pi + Float.atan2 (-z) x in
   let u = phi / (2.0 * Float.pi) in

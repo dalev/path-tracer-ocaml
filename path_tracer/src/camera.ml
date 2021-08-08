@@ -16,11 +16,11 @@ module Mat4 = struct
     let x' = V3.normalize (V3.cross z' (V3.normalize up)) in
     let y' = V3.normalize (V3.cross x' z') in
     let e v =
-      let x, y, z = V3.coords v in
+      let { V3.x; y; z } = v in
       v4 x y z ~-.(V3.dot eye v)
     in
     let e' v =
-      let x, y, z = V3.coords v in
+      let { V3.x; y; z } = v in
       v4 ~-.x ~-.y ~-.z (V3.dot eye v)
     in
     v4 (e x') (e y') (e' z') (v4 0.0 0.0 0.0 1.0)
@@ -32,7 +32,7 @@ module Mat4 = struct
   ;;
 
   let homogeneous p =
-    let x, y, z = V3.coords (P3.to_v3 p) in
+    let { P3.x; y; z } = p in
     v4 x y z 1.0
   ;;
 
@@ -59,7 +59,7 @@ let create ~eye ~target ~up ~aspect ~vertical_fov_deg =
   let neg_z = V3.Infix.(~-V3.unit_z) in
   let translate = V3.of_points ~src:eye ~tgt:target in
   let xlate' = V3.normalize translate in
-  let _, _, z = V3.coords xlate' in
+  let z = xlate'.V3.z in
   let rot1 =
     (* rot1 rotates eye->target to the -Z axis *)
     let theta = Float.acos ~-.z in

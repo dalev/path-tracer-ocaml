@@ -1,7 +1,7 @@
 type t = V3.t
 
 let create ~r ~g ~b = V3.create ~x:r ~y:g ~z:b
-let to_rgb = V3.coords
+let to_rgb { V3.x; y; z } = x, y, z
 let of_v3 v = v
 let to_v3 v = v
 let black = create ~r:0.0 ~g:0.0 ~b:0.0

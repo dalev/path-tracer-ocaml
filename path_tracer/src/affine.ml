@@ -10,16 +10,17 @@ let to_string { x; y; z } = Printf.sprintf "(%f, %f, %f)" x y z
 let pp f t = Caml.Format.pp_print_string f (to_string t)
 
 module V3 = struct
-  type t = p3
+  type t = p3 =
+    { x : float
+    ; y : float
+    ; z : float
+    }
 
   let pp = pp
   let create ~x ~y ~z : t = { x; y; z }
-  let coords { x; y; z } = x, y, z
-  let of_tuple (x, y, z) = { x; y; z }
   let x t = t.x
   let y t = t.y
   let z t = t.z
-  let yzx { x; y; z } = { x = y; y = z; z = x }
   let unit_x = create ~x:1.0 ~y:0.0 ~z:0.0
   let unit_y = create ~x:0.0 ~y:1.0 ~z:0.0
   let unit_z = create ~x:0.0 ~y:0.0 ~z:1.0
@@ -79,5 +80,5 @@ module P3 = struct
   let origin = V3.zero
   let to_v3 = Fn.id
   let of_v3 = Fn.id
-  let translate t v = V3.Infix.(t + v)
+  let translate t v = Infix.(t + v)
 end

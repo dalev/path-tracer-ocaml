@@ -24,16 +24,16 @@ let union_opt o o' =
 ;;
 
 let longest_axis { min; max } =
-  let open Float.O in
-  let x, y, z = P3.coords P3.Infix.(max - min) in
+  let { P3.x; y; z } = P3.Infix.(max - min) in
   let m = Float.max x (Float.max y z) in
+  let open Float.O in
   if m = x then Axis.X else if m = y then Axis.Y else Axis.Z
 ;;
 
 let surface_area { min; max } =
-  let v = V3.of_points ~src:min ~tgt:max in
-  let v' = V3.yzx v in
-  2.0 *. V3.dot v v'
+  let { P3.x; y; z } = P3.Infix.(max - min) in
+  let open Float.O in
+  2.0 * ((x * y) + (y * z) + (z * x))
 ;;
 
 let hit_range t ray ~t_min ~t_max =

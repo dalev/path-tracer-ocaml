@@ -110,8 +110,9 @@ module Mesh = struct
      assert (lx = ly);
      assert (ly = lz));
     let xs, ys, zs = map3 lengths ~f:FArray.create in
+    let p3 (x, y, z) = P3.create ~x ~y ~z in
     for i = 0 to fst3 lengths - 1 do
-      let xyz = P3.of_tuple @@ map3 xyzs' ~f:(Fn.flip FArray.get i) in
+      let xyz = p3 @@ map3 xyzs' ~f:(Fn.flip FArray.get i) in
       let p = Camera.transform camera xyz in
       FArray.set xs i (P3.x p);
       FArray.set ys i (P3.y p);

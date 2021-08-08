@@ -25,7 +25,7 @@ let scatter t ss tex_coord ~omega_i ~hit_front =
     fun _u -> evt
   | Metal tex ->
     let omega_r = Shader_space.reflect ss omega_i in
-    let _, _, z = V3.coords omega_r in
+    let z = omega_r.V3.z in
     let evt =
       if Float.( <= ) z 0.0
       then Scatter.Absorb

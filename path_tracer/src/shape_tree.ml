@@ -178,23 +178,26 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
       Leaf { bbox; leaf = L.of_elts (Slice.to_array_map shapes ~f:Bshape.shape) }
     ;;
 
-    let rec create bbox shapes =
-      if Slice.length shapes <= L.length_cutoff
-      then make_leaf bbox shapes
-      else (
-        match Proposal.create shapes with
-        | None -> make_leaf bbox shapes
-        | Some p ->
-          let leaf_cost = Proposal.leaf_cost (Slice.length shapes) in
-          let open Float.O in
-          if Proposal.cost p > leaf_cost
-          then make_leaf bbox shapes
-          else (
-            let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
-            let lhs = create (Proposal.lhs_box p) l in
-            let rhs = create (Proposal.rhs_box p) r in
-            let axis = V3.axis @@ Proposal.axis p in
-            Branch { lhs; rhs; bbox; axis }))
+    let create bbox shapes =
+      let rec loop bbox shapes k =
+        if Slice.length shapes <= L.length_cutoff
+        then k @@ make_leaf bbox shapes
+        else (
+          match Proposal.create shapes with
+          | None -> k @@ make_leaf bbox shapes
+          | Some p ->
+            let leaf_cost = Proposal.leaf_cost (Slice.length shapes) in
+            let open Float.O in
+            if Proposal.cost p > leaf_cost
+            then k @@ make_leaf bbox shapes
+            else (
+              let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
+              let axis = V3.axis @@ Proposal.axis p in
+              let rhs_box = Proposal.rhs_box p in
+              loop (Proposal.lhs_box p) l (fun lhs ->
+                  loop rhs_box r (fun rhs -> k @@ Branch { lhs; rhs; bbox; axis }))))
+      in
+      loop bbox shapes Fn.id
     ;;
 
     let intersect t ray ~t_min ~t_max =

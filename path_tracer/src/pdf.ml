@@ -8,7 +8,7 @@ let sample t (_ : Shader_space.t) u v =
 ;;
 
 let eval t (dir : V3.t) (_ : Shader_space.t) =
-  let _, _, z = V3.coords @@ V3.normalize dir in
+  let z = (V3.normalize dir).V3.z in
   match t with
   | Diffuse -> if Float.is_negative z then 0.0 else z /. Float.pi
 ;;
