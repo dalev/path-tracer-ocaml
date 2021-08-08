@@ -36,10 +36,10 @@ let surface_area { min; max } =
   2.0 * ((x * y) + (y * z) + (z * x))
 ;;
 
-let hit_range t ray ~t_min ~t_max =
+let[@inline] hit_range t ray ~t_min ~t_max =
   let invd = Ray.direction_inv ray in
   let o = Ray.origin ray in
-  let f p = V3.Infix.( * ) (P3.to_v3 P3.Infix.(p - o)) invd in
+  let[@inline] f p = V3.Infix.( * ) (P3.to_v3 P3.Infix.(p - o)) invd in
   let t0' = f t.min in
   let t1' = f t.max in
   let t0 = V3.map2 ~f:Float.min t0' t1' in
