@@ -198,7 +198,7 @@ module Make_array_leaf (Elt : sig
 
   val bbox : t -> Bbox.t
   val intersect : t -> Ray.t -> t_min:float -> t_max:float -> Tri_hit.t option
-end) : Skd_tree.Leaf with type elt = Elt.t and type elt_hit = Tri_hit.t = struct
+end) : Shape_tree.Leaf with type elt = Elt.t and type elt_hit = Tri_hit.t = struct
   type t = Elt.t array
   type elt = Elt.t
   type elt_hit = Tri_hit.t
@@ -267,7 +267,7 @@ let main args =
     end)
   in
   let module Leaf = Make_array_leaf (Triangle) in
-  let module Triangles = Skd_tree.Make (Leaf) in
+  let module Triangles = Shape_tree.Make (Leaf) in
   let module Leaf_lengths = struct
     type s =
       { size : int

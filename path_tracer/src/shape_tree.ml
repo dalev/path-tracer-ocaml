@@ -1,5 +1,5 @@
 open Base
-include Skd_tree_intf
+include Shape_tree_intf
 
 let num_bins = 32
 

@@ -138,7 +138,7 @@ let background =
 ;;
 
 module type Leaf_S =
-  Skd_tree.Leaf with type elt = Sphere.t and type elt_hit = float * Sphere.t
+  Shape_tree.Leaf with type elt = Sphere.t and type elt_hit = float * Sphere.t
 
 module Array_leaf : Leaf_S = struct
   type t = Sphere.t array
@@ -258,7 +258,7 @@ module Simd_leaf : Leaf_S = struct
 end
 
 module type Spheres_S =
-  Skd_tree.S with type elt := Sphere.t and type elt_hit := float * Sphere.t
+  Shape_tree.S with type elt := Sphere.t and type elt_hit := float * Sphere.t
 
 let main args =
   let { Args.width; height; spp; output; no_progress; max_bounces; no_simd } = args in
@@ -266,7 +266,7 @@ let main args =
     if no_simd then (module Array_leaf : Leaf_S) else (module Simd_leaf : Leaf_S)
   in
   let module Leaf = (val leaf : Leaf_S) in
-  let module Spheres : Spheres_S = Skd_tree.Make (Leaf) in
+  let module Spheres : Spheres_S = Shape_tree.Make (Leaf) in
   let module Leaf_lengths = struct
     type s =
       { size : int
