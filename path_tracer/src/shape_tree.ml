@@ -126,100 +126,98 @@ module Proposal = struct
 end
 
 module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit = struct
-  type tree =
-    | Leaf of
-        { bbox : Bbox.t
-        ; leaf : L.t
-        }
-    | Branch of
-        { axis : V3.t -> float
-        ; bbox : Bbox.t
-        ; lhs : tree
-        ; rhs : tree
-        }
+  module Tree = struct
+    type t =
+      | Leaf of
+          { bbox : Bbox.t
+          ; leaf : L.t
+          }
+      | Branch of
+          { axis : V3.t -> float
+          ; bbox : Bbox.t
+          ; lhs : t
+          ; rhs : t
+          }
 
-  type t = { root : tree }
+    let rec cata t ~branch ~leaf =
+      match t with
+      | Leaf { leaf = l; _ } -> leaf l
+      | Branch { lhs; rhs; _ } -> branch (cata lhs ~branch ~leaf) (cata rhs ~branch ~leaf)
+    ;;
 
-  let rec tree_cata t ~branch ~leaf =
-    match t with
-    | Leaf { leaf = l; _ } -> leaf l
-    | Branch { lhs; rhs; _ } ->
-      branch (tree_cata lhs ~branch ~leaf) (tree_cata rhs ~branch ~leaf)
-  ;;
-
-  let cata t ~branch ~leaf = tree_cata t.root ~branch ~leaf
-  let length = cata ~branch:( + ) ~leaf:L.length
-  let depth = cata ~branch:(fun l r -> 1 + max l r) ~leaf:L.depth
-
-  let iter_leaves t ~f =
-    let rec loop t =
+    let rec iter_leaves t ~f =
       match t with
       | Leaf { leaf = l; _ } -> f l
       | Branch { lhs; rhs; _ } ->
-        loop lhs;
-        loop rhs
-    in
-    loop t.root
-  ;;
+        iter_leaves lhs ~f;
+        iter_leaves rhs ~f
+    ;;
+
+    let make_leaf bbox shapes =
+      Leaf { bbox; leaf = L.of_elts (Slice.to_array_map shapes ~f:Bshape.shape) }
+    ;;
+
+    let rec create bbox shapes =
+      if Slice.length shapes <= L.length_cutoff
+      then make_leaf bbox shapes
+      else (
+        match Proposal.create shapes with
+        | None -> make_leaf bbox shapes
+        | Some p ->
+          let leaf_cost = Proposal.leaf_cost (Slice.length shapes) in
+          let open Float.O in
+          if Proposal.cost p > leaf_cost
+          then make_leaf bbox shapes
+          else (
+            let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
+            let lhs = create (Proposal.lhs_box p) l in
+            let rhs = create (Proposal.rhs_box p) r in
+            let axis = V3.axis @@ Proposal.axis p in
+            Branch { lhs; rhs; bbox; axis }))
+    ;;
+
+    let intersect t ray ~t_min ~t_max =
+      let dir = Ray.direction ray in
+      let open Float.O in
+      let rec loop t ~t_min ~t_max k =
+        match t with
+        | Leaf { bbox; leaf = l } ->
+          let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
+          if t_min <= t_max then k @@ L.intersect l ray ~t_min ~t_max else k None
+        | Branch { bbox; axis; lhs; rhs } ->
+          let t_min, t_max = (Bbox.hit_range [@inlined]) bbox ray ~t_min ~t_max in
+          if t_min > t_max
+          then k None
+          else (
+            let t1, t2 = if axis dir >= 0.0 then lhs, rhs else rhs, lhs in
+            loop t1 ~t_min ~t_max (function
+                | None -> loop t2 ~t_min ~t_max k
+                | Some elt_hit as t1_result ->
+                  let t_hit = L.elt_hit_t elt_hit in
+                  loop t2 ~t_min ~t_max:t_hit (function
+                      | Some _ as t2_result -> k t2_result
+                      | None -> k t1_result)))
+      in
+      let k0 x = x in
+      loop t ~t_min ~t_max k0
+    ;;
+  end
+
+  type t = { root : Tree.t }
+
+  let cata t = Tree.cata t.root
+  let length = cata ~branch:( + ) ~leaf:L.length
+  let depth = cata ~branch:(fun l r -> 1 + max l r) ~leaf:L.depth
 
   let leaf_length_histogram t =
     let h = Hashtbl.create (module Int) in
-    iter_leaves t ~f:(fun l ->
+    Tree.iter_leaves t.root ~f:(fun l ->
         let len = L.length l in
         Hashtbl.incr h len);
     h
   ;;
 
-  let intersect_tree t ray ~t_min ~t_max =
-    let dir = Ray.direction ray in
-    let open Float.O in
-    let rec loop t ~t_min ~t_max k =
-      match t with
-      | Leaf { bbox; leaf = l } ->
-        let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
-        if t_min <= t_max then k @@ L.intersect l ray ~t_min ~t_max else k None
-      | Branch { bbox; axis; lhs; rhs } ->
-        let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
-        if t_min > t_max
-        then k None
-        else (
-          let t1, t2 = if axis dir >= 0.0 then lhs, rhs else rhs, lhs in
-          loop t1 ~t_min ~t_max (function
-              | None -> loop t2 ~t_min ~t_max k
-              | Some elt_hit as t1_result ->
-                let t_hit = L.elt_hit_t elt_hit in
-                loop t2 ~t_min ~t_max:t_hit (function
-                    | Some _ as t2_result -> k t2_result
-                    | None -> k t1_result)))
-    in
-    let k0 x = x in
-    loop t ~t_min ~t_max k0
-  ;;
-
-  let intersect t ray ~t_min ~t_max = intersect_tree t.root ray ~t_min ~t_max
-
-  let make_leaf bbox shapes =
-    Leaf { bbox; leaf = L.of_elts (Slice.to_array_map shapes ~f:Bshape.shape) }
-  ;;
-
-  let rec create_tree bbox shapes =
-    if Slice.length shapes <= L.length_cutoff
-    then make_leaf bbox shapes
-    else (
-      match Proposal.create shapes with
-      | None -> make_leaf bbox shapes
-      | Some p ->
-        let leaf_cost = Proposal.leaf_cost (Slice.length shapes) in
-        let open Float.O in
-        if Proposal.cost p > leaf_cost
-        then make_leaf bbox shapes
-        else (
-          let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
-          let lhs = create_tree (Proposal.lhs_box p) l in
-          let rhs = create_tree (Proposal.rhs_box p) r in
-          let axis = V3.axis @@ Proposal.axis p in
-          Branch { lhs; rhs; bbox; axis }))
-  ;;
+  let intersect t ray ~t_min ~t_max = Tree.intersect t.root ray ~t_min ~t_max
 
   let create elts =
     if List.is_empty elts then failwith "Skd_tree.create: given empty list of shapes";
@@ -230,7 +228,7 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
       |> Slice.create
     in
     let bbox = Slice.map_reduce elts ~transform:Bshape.bbox ~combine:Bbox.union in
-    let root = create_tree bbox elts in
+    let root = Tree.create bbox elts in
     { root }
   ;;
 end
