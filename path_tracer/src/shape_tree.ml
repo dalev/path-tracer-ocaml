@@ -118,13 +118,13 @@ module Proposal = struct
 
   let compare p1 p2 = Float.compare (cost p1) (cost p2)
 
-  let propose_split_one_axis shapes axis cbox =
+  let propose_split_one_axis shapes axis cbbox =
     let num_bins = 32 in
     let to_axis = P3.axis axis in
     let to_bin =
       let epsilon = 1e-6 in
-      let cb_min = to_axis (Bbox.min cbox) in
-      let cb_max = to_axis (Bbox.max cbox) in
+      let cb_min = to_axis (Bbox.min cbbox) in
+      let cb_max = to_axis (Bbox.max cbbox) in
       let scale = Float.of_int num_bins *. (1.0 -. epsilon) /. (cb_max -. cb_min) in
       fun b -> Float.to_int (scale *. (to_axis (Bshape.centroid b) -. cb_min))
     in
