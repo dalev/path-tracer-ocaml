@@ -9,7 +9,6 @@ module Bshape = struct
     }
 
   let bbox t = t.bbox
-  let cbox t = Bbox.create ~min:t.centroid ~max:t.centroid
   let centroid t = t.centroid
   let shape t = t.shape
 
@@ -19,7 +18,10 @@ module Bshape = struct
     { shape; bbox; centroid }
   ;;
 
-  let centroid_bbox bshapes = Slice.map_reduce bshapes ~transform:cbox ~combine:Bbox.union
+  let centroid_bbox bshapes =
+    let transform t = Bbox.create ~min:t.centroid ~max:t.centroid in
+    Slice.map_reduce bshapes ~transform ~combine:Bbox.union
+  ;;
 end
 
 module Bin = struct
@@ -94,26 +96,26 @@ module Proposal = struct
     in
     let total_area = Bbox.surface_area total_bbox in
     let total_count = Array.sum (module Int) bins ~f:Bin.count in
-    (* subtlety: List.init runs 'backwards', this mutable state maintenance is sensitive to that *)
-    let n_right = ref 0 in
-    List.init
-      (Array.length bins - 1)
-      ~f:(fun p ->
+    let rec loop p candidates ~n_left =
+      if p >= Array.length bins - 1
+      then candidates
+      else (
         let lhs = bins.(p) in
         let rhs = bins.(p + 1) in
-        let rhs_count = !n_right + Bin.count rhs in
-        let lhs_count = total_count - rhs_count in
-        n_right := rhs_count;
+        let lhs_count = n_left + Bin.count lhs in
+        let rhs_count = total_count - lhs_count in
+        let n_left = lhs_count in
         match Bin.bbox_l lhs, Bin.bbox_r rhs with
-        | None, _ | _, None -> None
+        | None, _ | _, None -> loop (p + 1) candidates ~n_left
         | Some lhs_box, Some rhs_box ->
           let lhs_area = Float.of_int lhs_count *. Bbox.surface_area lhs_box in
           let rhs_area = Float.of_int rhs_count *. Bbox.surface_area rhs_box in
           let on_lhs b = to_bin b <= p in
-          let open Float.O in
-          let cost = costT + ((lhs_area + rhs_area) * costI / total_area) in
-          Some { cost; split_index = p; axis; on_lhs; lhs_box; rhs_box })
-    |> List.filter_opt
+          let cost = Float.O.(costT + ((lhs_area + rhs_area) * costI / total_area)) in
+          let c = { cost; split_index = p; axis; on_lhs; lhs_box; rhs_box } in
+          loop (p + 1) (c :: candidates) ~n_left)
+    in
+    loop 0 [] ~n_left:0
   ;;
 
   let compare p1 p2 = Float.compare (cost p1) (cost p2)
@@ -138,9 +140,7 @@ module Proposal = struct
   let create shapes =
     let cbbox = Bshape.centroid_bbox shapes in
     let candidates =
-      List.filter_map
-        Axis.[ X; Y; Z ]
-        ~f:(fun axis -> propose_split_one_axis shapes axis cbbox)
+      List.filter_map Axis.all ~f:(fun axis -> propose_split_one_axis shapes axis cbbox)
     in
     List.min_elt candidates ~compare
   ;;
