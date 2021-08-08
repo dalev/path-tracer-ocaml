@@ -132,7 +132,7 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
         ; leaf : L.t
         }
     | Branch of
-        { axis : Axis.t
+        { axis : V3.t -> float
         ; bbox : Bbox.t
         ; lhs : tree
         ; rhs : tree
@@ -176,15 +176,14 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
     let rec loop t ~t_min ~t_max k =
       match t with
       | Leaf { bbox; leaf = l } ->
-        if Bbox.is_hit bbox ray ~t_min ~t_max
-        then k @@ L.intersect l ray ~t_min ~t_max
-        else k @@ None
+        let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
+        if t_min <= t_max then k @@ L.intersect l ray ~t_min ~t_max else k None
       | Branch { bbox; axis; lhs; rhs } ->
         let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
         if t_min > t_max
-        then k @@ None
+        then k None
         else (
-          let t1, t2 = if V3.axis axis dir >= 0.0 then lhs, rhs else rhs, lhs in
+          let t1, t2 = if axis dir >= 0.0 then lhs, rhs else rhs, lhs in
           loop t1 ~t_min ~t_max (function
               | None -> loop t2 ~t_min ~t_max k
               | Some elt_hit as t1_result ->
@@ -218,7 +217,7 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
           let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
           let lhs = create_tree (Proposal.lhs_box p) l in
           let rhs = create_tree (Proposal.rhs_box p) r in
-          let axis = Proposal.axis p in
+          let axis = V3.axis @@ Proposal.axis p in
           Branch { lhs; rhs; bbox; axis }))
   ;;
 
