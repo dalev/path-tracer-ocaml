@@ -50,6 +50,6 @@ let[@inline] hit_range t ray ~t_min ~t_max =
 ;;
 
 let is_hit t ray ~t_min ~t_max =
-  let a, b = hit_range t ray ~t_min ~t_max in
+  let a, b = (hit_range [@inlined]) t ray ~t_min ~t_max in
   Float.( <= ) a b
 ;;

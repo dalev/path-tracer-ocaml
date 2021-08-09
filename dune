@@ -1,12 +1,6 @@
 (data_only_dirs sphere-intersect-rs)
 
 (env
- (dev
-  (ocamlopt_flags
-   (:standard -O3)))
  (release
   (ocamlopt_flags
-   (:standard
-    ; -dump-into-file -dcmm
-    ; -nodynlink
-    -O3))))
+   (:standard -O3))))

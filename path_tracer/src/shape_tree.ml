@@ -166,13 +166,7 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
       | Branch { lhs; rhs; _ } -> branch (cata lhs ~branch ~leaf) (cata rhs ~branch ~leaf)
     ;;
 
-    let rec iter_leaves t ~f =
-      match t with
-      | Leaf { leaf = l; _ } -> f l
-      | Branch { lhs; rhs; _ } ->
-        iter_leaves lhs ~f;
-        iter_leaves rhs ~f
-    ;;
+    let iter_leaves t ~f = cata t ~branch:(fun () () -> ()) ~leaf:f
 
     let make_leaf bbox shapes =
       Leaf { bbox; leaf = L.of_elts (Slice.to_array_map shapes ~f:Bshape.shape) }
@@ -201,29 +195,28 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
     ;;
 
     let intersect t ray ~t_min ~t_max =
-      let open Float.O in
-      let rec loop t ray ~t_min ~t_max k =
-        let dir = Ray.direction ray in
+      let dir = Ray.direction ray in
+      let rec loop t ~t_min ~t_max =
+        let open Float.O in
         match t with
         | Leaf { bbox; leaf = l } ->
           let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
-          if t_min <= t_max then k @@ L.intersect l ray ~t_min ~t_max else k None
+          if t_min <= t_max then L.intersect l ray ~t_min ~t_max else None
         | Branch { bbox; axis; lhs; rhs } ->
           let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
           if t_min > t_max
-          then k None
+          then None
           else (
             let t1, t2 = if axis dir >= 0.0 then lhs, rhs else rhs, lhs in
-            loop t1 ray ~t_min ~t_max (function
-                | None -> loop t2 ray ~t_min ~t_max k
-                | Some elt_hit as t1_result ->
-                  let t_hit = L.elt_hit_t elt_hit in
-                  loop t2 ray ~t_min ~t_max:t_hit (function
-                      | Some _ as t2_result -> k t2_result
-                      | None -> k t1_result)))
+            match loop t1 ~t_min ~t_max with
+            | None -> loop t2 ~t_min ~t_max
+            | Some elt_hit as t1_result ->
+              let t_hit = L.elt_hit_t elt_hit in
+              (match loop t2 ~t_min ~t_max:t_hit with
+              | Some _ as t2_result -> t2_result
+              | None -> t1_result))
       in
-      let k0 x = x in
-      loop t ray ~t_min ~t_max k0
+      loop t ~t_min ~t_max
     ;;
   end
 

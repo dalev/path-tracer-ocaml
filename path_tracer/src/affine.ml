@@ -39,11 +39,11 @@ module V3 = struct
   let one = of_float 1.0
 
   module Infix = struct
-    let ( + ) a b = map2 ~f:( +. ) a b
-    let ( - ) a b = map2 ~f:( -. ) a b
-    let ( * ) a b = map2 ~f:( *. ) a b
-    let ( / ) a b = map2 ~f:( /. ) a b
-    let ( ~- ) a = map ~f:( ~-. ) a
+    let[@inline] ( + ) a b = map2 ~f:( +. ) a b
+    let[@inline] ( - ) a b = map2 ~f:( -. ) a b
+    let[@inline] ( * ) a b = map2 ~f:( *. ) a b
+    let[@inline] ( / ) a b = map2 ~f:( /. ) a b
+    let[@inline] ( ~- ) a = map ~f:( ~-. ) a
   end
 
   let of_points ~src ~tgt = Infix.( - ) tgt src
