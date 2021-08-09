@@ -260,6 +260,14 @@ end
 module type Spheres_S =
   Shape_tree.S with type elt := Sphere.t and type elt_hit := float * Sphere.t
 
+let with_elapsed_time f =
+  let start = Time_now.nanoseconds_since_unix_epoch () in
+  let x = f () in
+  let stop = Time_now.nanoseconds_since_unix_epoch () in
+  let elapsed = Int63.(stop - start) in
+  elapsed, x
+;;
+
 let main args =
   let { Args.width; height; spp; output; no_progress; max_bounces; no_simd } = args in
   let leaf =
@@ -298,11 +306,14 @@ let main args =
   printf "dim = %d x %d;\n" width height;
   printf "#spheres = %d\n" (List.length spheres);
   let camera = camera (width // height) in
-  let tree =
-    List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
-    |> Spheres.create
+  let elapsed, tree =
+    let spheres =
+      List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
+    in
+    with_elapsed_time (fun () -> Spheres.create spheres)
   in
   printf "tree depth = %d\n" (Spheres.depth tree);
+  printf "build time = %.3f ms\n" (Float.of_int63 elapsed *. 1e-6);
   printf
     "leaf lengths =\n%s\n%!"
     (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree));
@@ -323,27 +334,28 @@ let main args =
       ~camera
       ~diffuse_plus_light:Pdf.diffuse
   in
-  let () =
-    if no_progress
-    then Integrator.render i ~update_progress:ignore
-    else (
-      let p =
-        let open Progress.Line in
-        let total = Integrator.count_tiles i in
-        list [ spinner (); elapsed (); bar ~style:`ASCII total; count_to total; spacer 4 ]
-      in
-      Progress.with_reporter p (fun report ->
-          let update_progress () = report 1 in
-          Integrator.render i ~update_progress))
+  let elapsed =
+    fst @@
+    with_elapsed_time (fun () ->
+      if no_progress
+      then Integrator.render i ~update_progress:ignore
+      else (
+        let p =
+          let open Progress.Line in
+          let total = Integrator.count_tiles i in
+          list [ spinner (); elapsed (); bar ~style:`ASCII total; count_to total; spacer 4 ]
+        in
+        Progress.with_reporter p (fun report ->
+            let update_progress () = report 1 in
+            Integrator.render i ~update_progress)))
   in
-  printf "\n";
   let () =
     match Bimage_io.write output img with
     | Ok () -> ()
     | Error (`File_not_found f) -> printf "File not found: %s" f
     | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other)
   in
-  printf "Done\n"
+  printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6);
 ;;
 
 let () = main (Args.parse ())

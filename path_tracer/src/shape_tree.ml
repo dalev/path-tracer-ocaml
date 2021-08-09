@@ -201,9 +201,9 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
     ;;
 
     let intersect t ray ~t_min ~t_max =
-      let dir = Ray.direction ray in
       let open Float.O in
-      let rec loop t ~t_min ~t_max k =
+      let rec loop t ray ~t_min ~t_max k =
+        let dir = Ray.direction ray in
         match t with
         | Leaf { bbox; leaf = l } ->
           let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
@@ -214,16 +214,16 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
           then k None
           else (
             let t1, t2 = if axis dir >= 0.0 then lhs, rhs else rhs, lhs in
-            loop t1 ~t_min ~t_max (function
-                | None -> loop t2 ~t_min ~t_max k
+            loop t1 ray ~t_min ~t_max (function
+                | None -> loop t2 ray ~t_min ~t_max k
                 | Some elt_hit as t1_result ->
                   let t_hit = L.elt_hit_t elt_hit in
-                  loop t2 ~t_min ~t_max:t_hit (function
+                  loop t2 ray ~t_min ~t_max:t_hit (function
                       | Some _ as t2_result -> k t2_result
                       | None -> k t1_result)))
       in
       let k0 x = x in
-      loop t ~t_min ~t_max k0
+      loop t ray ~t_min ~t_max k0
     ;;
   end
 

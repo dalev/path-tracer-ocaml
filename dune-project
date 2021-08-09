@@ -5,6 +5,7 @@
 (maintainers "dalev@alum.wpi.edu")
 (package
  (name path_tracer)
+ (synopsis "library for the geometry-agnostic portion")
  (depends
   (core (>= v0.14.1))
   (stdio (>= v0.14.0))
@@ -17,9 +18,11 @@
   (ocaml (>= 4.12))))
 (package
  (name low_discrepancy_sequence)
+ (synopsis "a low-discrepancy point sequence in N-dimensions")
  (depends (alcotest (and :with-test (>= "1.4"))) (ocaml (>= 4.12))))
 (package
  (name ply_format)
+ (synopsis "parse .ply files (stanford triangle format)")
  (depends
   (alcotest (and (>= 1.4.0) :with-test))
   (core_kernel (>= v0.14.1))
