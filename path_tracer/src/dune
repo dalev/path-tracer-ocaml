@@ -1,4 +1,4 @@
 (library
  (name path_tracer)
  (public_name path_tracer)
- (libraries base low_discrepancy_sequence))
+ (libraries base domainslib low_discrepancy_sequence))

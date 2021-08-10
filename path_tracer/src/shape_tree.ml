@@ -1,5 +1,6 @@
 open Base
 include Shape_tree_intf
+module Task = Domainslib.Task
 
 module Bshape = struct
   type 'a t =
@@ -172,26 +173,37 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
       Leaf { bbox; leaf = L.of_elts (Slice.to_array_map shapes ~f:Bshape.shape) }
     ;;
 
-    let create bbox shapes =
-      let rec loop bbox shapes k =
+    let create pool bbox shapes =
+      let rec loop bbox shapes ~depth =
         if Slice.length shapes <= L.length_cutoff
-        then k @@ make_leaf bbox shapes
+        then make_leaf bbox shapes
         else (
           match Proposal.create shapes with
-          | None -> k @@ make_leaf bbox shapes
+          | None -> make_leaf bbox shapes
           | Some p ->
             let leaf_cost = Proposal.leaf_cost (Slice.length shapes) in
             let open Float.O in
             if Proposal.cost p > leaf_cost
-            then k @@ make_leaf bbox shapes
+            then make_leaf bbox shapes
             else (
               let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
               let axis = V3.axis @@ Proposal.axis p in
               let rhs_box = Proposal.rhs_box p in
-              loop (Proposal.lhs_box p) l (fun lhs ->
-                  loop rhs_box r (fun rhs -> k @@ Branch { lhs; rhs; bbox; axis }))))
+              let spawn_rhs = Int.O.(Slice.length r >= 1000 && depth < 7) in
+              let depth = Int.O.(depth + 1) in
+              let do_rhs =
+                let thunk () = loop rhs_box r ~depth in
+                if not spawn_rhs
+                then thunk
+                else (
+                  let t = Task.async pool thunk in
+                  fun () -> Task.await pool t)
+              in
+              let lhs = loop (Proposal.lhs_box p) l ~depth in
+              let rhs = do_rhs () in
+              Branch { lhs; rhs; bbox; axis }))
       in
-      loop bbox shapes Fn.id
+      loop bbox shapes ~depth:0
     ;;
 
     let intersect t ray ~t_min ~t_max =
@@ -245,8 +257,10 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
       |> Sequence.to_array
       |> Slice.create
     in
+    let pool = Task.setup_pool ~num_additional_domains:7 in
     let bbox = Slice.map_reduce elts ~transform:Bshape.bbox ~combine:Bbox.union in
-    let root = Tree.create bbox elts in
+    let root = Tree.create pool bbox elts in
+    Task.teardown_pool pool;
     { root }
   ;;
 end

@@ -168,8 +168,14 @@ let create_tile_samplers t tiles =
 ;;
 
 let render ~update_progress t =
-  create_tile_samplers t t.tiles
-  |> List.iter ~f:(fun (tile, sampler) ->
-         render_tile t tile sampler;
-         update_progress ())
+  let module Task = Domainslib.Task in
+  let pool = Task.setup_pool ~num_additional_domains:7 in
+  let tasks =
+    List.map (create_tile_samplers t t.tiles) ~f:(fun (tile, sampler) ->
+        Task.async pool (fun () -> render_tile t tile sampler))
+  in
+  List.iter tasks ~f:(fun t ->
+      Task.await pool t;
+      update_progress ());
+  Task.teardown_pool pool
 ;;
