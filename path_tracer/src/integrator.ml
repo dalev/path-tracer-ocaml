@@ -176,6 +176,7 @@ let render ~update_progress t =
   in
   List.iter tasks ~f:(fun t ->
       Task.await pool t;
+      (* CR dalev: use a channel to handle progress updates from one thread *)
       update_progress ());
   Task.teardown_pool pool
 ;;
