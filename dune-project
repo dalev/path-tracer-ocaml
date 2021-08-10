@@ -7,6 +7,8 @@
  (name path_tracer)
  (synopsis "library for the geometry-agnostic portion")
  (depends
+  (time_now (>= v0.14.0))
+  (domainslib (>= 0.3.0))
   (core (>= v0.14.1))
   (stdio (>= v0.14.0))
   (progress (>= 0.2.1))

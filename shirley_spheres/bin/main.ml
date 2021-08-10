@@ -335,19 +335,37 @@ let main args =
       ~diffuse_plus_light:Pdf.diffuse
   in
   let elapsed =
-    fst @@
-    with_elapsed_time (fun () ->
-      if no_progress
-      then Integrator.render i ~update_progress:ignore
-      else (
-        let p =
-          let open Progress.Line in
-          let total = Integrator.count_tiles i in
-          list [ spinner (); elapsed (); bar ~style:`ASCII total; count_to total; spacer 4 ]
-        in
-        Progress.with_reporter p (fun report ->
-            let update_progress () = report 1 in
-            Integrator.render i ~update_progress)))
+    fst
+    @@ with_elapsed_time (fun () ->
+           if no_progress
+           then Integrator.render i ~update_progress:ignore
+           else (
+             let total = Integrator.count_tiles i in
+             let p =
+               let open Progress.Line in
+               list
+                 [ spinner ()
+                 ; elapsed ()
+                 ; bar ~style:`ASCII total
+                 ; count_to total
+                 ; spacer 4
+                 ]
+             in
+             let module C = Domainslib.Chan in
+             let c = C.make_bounded 8 in
+             Progress.with_reporter p (fun report ->
+                 let update_progress () = C.send c 1 in
+                 let d =
+                   Caml.Domain.spawn (fun () ->
+                       let remaining = ref total in
+                       while !remaining > 0 do
+                         let m = C.recv c in
+                         remaining := !remaining - m;
+                         report m
+                       done)
+                 in
+                 Integrator.render i ~update_progress;
+                 Caml.Domain.join d)))
   in
   let () =
     match Bimage_io.write output img with
@@ -355,7 +373,7 @@ let main args =
     | Error (`File_not_found f) -> printf "File not found: %s" f
     | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other)
   in
-  printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6);
+  printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6)
 ;;
 
 let () = main (Args.parse ())
