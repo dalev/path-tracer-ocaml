@@ -349,14 +349,26 @@ let main args =
     if no_progress
     then Integrator.render i ~update_progress:ignore
     else (
+      let total = Integrator.count_tiles i in
       let p =
         let open Progress.Line in
-        let total = Integrator.count_tiles i in
         list [ spinner (); elapsed (); bar ~style:`ASCII total; count_to total; spacer 4 ]
       in
+      let module C = Domainslib.Chan in
+      let c = C.make_bounded 8 in
       Progress.with_reporter p (fun report ->
-          let update_progress () = report 1 in
-          Integrator.render i ~update_progress))
+          let update_progress () = C.send c 1 in
+          let d =
+            Caml.Domain.spawn (fun () ->
+                let remaining = ref total in
+                while !remaining > 0 do
+                  let m = C.recv c in
+                  remaining := !remaining - m;
+                  report m
+                done)
+          in
+          Integrator.render i ~update_progress;
+          Caml.Domain.join d))
   in
   printf "\n";
   let () =

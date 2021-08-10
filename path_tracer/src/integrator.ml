@@ -172,11 +172,10 @@ let render ~update_progress t =
   let pool = Task.setup_pool ~num_additional_domains:7 in
   let tasks =
     List.map (create_tile_samplers t t.tiles) ~f:(fun (tile, sampler) ->
-        Task.async pool (fun () -> render_tile t tile sampler))
+        Task.async pool (fun () ->
+            render_tile t tile sampler;
+            update_progress ()))
   in
-  List.iter tasks ~f:(fun t ->
-      Task.await pool t;
-      (* CR dalev: use a channel to handle progress updates from one thread *)
-      update_progress ());
+  List.iter tasks ~f:(fun t -> Task.await pool t);
   Task.teardown_pool pool
 ;;
