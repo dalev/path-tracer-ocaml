@@ -1,9 +1,12 @@
 open Base
 
 module Coord = struct
-  type t = float * float
+  type t =
+    { u : float
+    ; v : float
+    }
 
-  let create u v = u, v
+  let create u v = { u; v }
 end
 
 type t = Coord.t -> Color.t
@@ -12,7 +15,7 @@ let eval t coord = t coord
 let solid c _ = c
 
 let checker ~width ~height even odd coord =
-  let u, v = coord in
+  let { Coord.u; v } = coord in
   let scale_coord c dim = Float.to_int (c *. Float.of_int (dim - 1)) in
   let x' = scale_coord u width in
   let y' = scale_coord v height in
