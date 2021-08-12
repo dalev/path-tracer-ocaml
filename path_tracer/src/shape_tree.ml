@@ -189,7 +189,7 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
               let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
               let axis = V3.axis @@ Proposal.axis p in
               let rhs_box = Proposal.rhs_box p in
-              let spawn_rhs = Int.O.(Slice.length r >= 1000 && depth < 7) in
+              let spawn_rhs = Int.O.(Slice.length r >= 5000 && depth < 8) in
               let depth = Int.O.(depth + 1) in
               let do_rhs =
                 let thunk () = loop rhs_box r ~depth in
@@ -248,6 +248,18 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
 
   let intersect t ray ~t_min ~t_max = Tree.intersect t.root ray ~t_min ~t_max
 
+  let chunks slice =
+    let len = Slice.length slice / 8 in
+    let rec loop slice chunks =
+      if Slice.length slice <= len
+      then slice :: chunks
+      else (
+        let pre, suf = Slice.split_at slice len in
+        loop suf (pre :: chunks))
+    in
+    loop slice []
+  ;;
+
   let create elts =
     if List.is_empty elts
     then failwith "Shape_tree.create: expected non-empty list of shapes";
@@ -258,7 +270,14 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
       |> Slice.create
     in
     let pool = Task.setup_pool ~num_additional_domains:7 in
-    let bbox = Slice.map_reduce elts ~transform:Bshape.bbox ~combine:Bbox.union in
+    let bbox =
+      let tasks =
+        List.map (chunks elts) ~f:(fun s ->
+            Task.async pool (fun () ->
+                Slice.map_reduce s ~transform:Bshape.bbox ~combine:Bbox.union))
+      in
+      List.map tasks ~f:(Task.await pool) |> List.reduce_exn ~f:Bbox.union
+    in
     let root = Tree.create pool bbox elts in
     Task.teardown_pool pool;
     { root }
