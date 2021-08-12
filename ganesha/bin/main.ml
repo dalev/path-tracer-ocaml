@@ -79,14 +79,11 @@ module Mesh = struct
     let p3 (x, y, z) = P3.create ~x ~y ~z in
     for i = 0 to fst3 lengths - 1 do
       let xyz = p3 @@ map3 xyzs' ~f:(Fn.flip FArray.get i) in
-      let p = Camera.transform camera xyz in
-      FArray.set xs i (P3.x p);
-      FArray.set ys i (P3.y p);
-      FArray.set zs i (P3.z p)
+      let { P3.x; y; z } = Camera.transform camera xyz in
+      FArray.set xs i x;
+      FArray.set ys i y;
+      FArray.set zs i z
     done;
-    assert (FArray.for_all Float.is_finite xs);
-    assert (FArray.for_all Float.is_finite ys);
-    assert (FArray.for_all Float.is_finite zs);
     { xs; ys; zs; faces }
   ;;
 end

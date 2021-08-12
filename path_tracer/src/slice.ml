@@ -10,19 +10,29 @@ let create base = { base; offset = 0; length = Array.length base }
 let length t = t.length
 let base_index t index = t.offset + index
 let get t index = t.base.(base_index t index)
+let unsafe_get t index = Array.unsafe_get t.base (base_index t index)
 let to_array_map t ~f = Array.init t.length ~f:(fun i -> f (get t i))
 let to_array t = to_array_map t ~f:Fn.id
 
 let fold_from t ~init ~f ~offset =
-  let rec loop acc i = if i < t.length then loop (f acc (get t i)) (i + 1) else acc in
-  loop init offset
+  let last_index = t.length - 1 in
+  let base_length = Array.length t.base in
+  assert (base_index t (Int.max offset last_index) < base_length);
+  let acc = ref init in
+  for i = offset to t.length - 1 do
+    acc := f !acc (unsafe_get t i)
+  done;
+  !acc
 ;;
 
 let fold = fold_from ~offset:0
 
 let iter t ~f =
-  for i = t.offset to t.offset + t.length - 1 do
-    f t.base.(i)
+  let last_index = t.offset + t.length - 1 in
+  let base_length = Array.length t.base in
+  assert (Int.max t.offset last_index < base_length);
+  for i = t.offset to last_index do
+    f (Array.unsafe_get t.base i)
   done
 ;;
 
