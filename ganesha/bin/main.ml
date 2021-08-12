@@ -4,62 +4,28 @@ open Path_tracer
 open Ply_format
 module Bigstring = Base_bigstring
 module FArray = Caml.Float.Array
-module Image = Bimage.Image
+module Common_args = Render_command.Args
 
 module Args = struct
   type t =
-    { width : int
-    ; height : int
-    ; spp : int
-    ; output : string
-    ; no_progress : bool
-    ; no_simd : bool
-    ; max_bounces : int
+    { common : Common_args.t
     ; ganesha_ply : string
     ; stop_after_bvh : bool
     }
 
   let parse () =
-    let width = ref 600 in
-    let height = ref !width in
-    let spp = ref 1 in
-    let file = ref "ganesha.png" in
-    let no_progress = ref false in
-    let no_simd = ref false in
     let stop_after_bvh = ref false in
-    let max_bounces = ref 4 in
     let ganesha_ply = ref "ganesha.ply" in
-    let usage_msg =
-      Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width !height !file
+    let specs =
+      Caml.Arg.
+        [ "-ganesha-ply", Set_string ganesha_ply, "<file> path to ganesha.ply"
+        ; "-stop-after-bvh", Set stop_after_bvh, "stop after BVH build"
+        ]
     in
-    Caml.Arg.parse
-      [ "-width", Set_int width, "<integer> image width"
-      ; "-height", Set_int height, "<integer> image height"
-      ; "-samples-per-pixel", Set_int spp, "<integer> samples-per-pixel"
-      ; "-o", Set_string file, "<file> output file"
-      ; "-no-simd", Set no_simd, "do not use SIMD accelerated intersection"
-      ; "-no-progress", Set no_progress, "suppress progress monitor"
-      ; "-max-bounces", Set_int max_bounces, "<integer> max ray bounces"
-      ; "-ganesha-ply", Set_string ganesha_ply, "<file> path to ganesha.ply"
-      ; "-stop-after-bvh", Set stop_after_bvh, "stop after BVH build"
-      ]
-      (fun (_ : string) -> failwith "No anonymous arguments expected")
-      usage_msg;
-    { width = !width
-    ; height = !height
-    ; spp = !spp
-    ; output = !file
-    ; no_progress = !no_progress
-    ; no_simd = !no_simd
-    ; max_bounces = !max_bounces
-    ; ganesha_ply = !ganesha_ply
-    ; stop_after_bvh = !stop_after_bvh
-    }
+    let common = Common_args.parse ~specs () in
+    { common; ganesha_ply = !ganesha_ply; stop_after_bvh = !stop_after_bvh }
   ;;
 end
-
-let color_space = Bimage.rgb
-let mkImage width height = Image.v Bimage.f64 color_space width height
 
 let camera aspect =
   let eye = P3.create ~x:328.0 ~y:40.282 ~z:245.0 in
@@ -242,28 +208,8 @@ let load_ply_exn path =
     ~finally:(fun () -> Unix.close fd)
 ;;
 
-let with_elapsed_time f =
-  let start = Time_now.nanoseconds_since_unix_epoch () in
-  let x = f () in
-  let stop = Time_now.nanoseconds_since_unix_epoch () in
-  let elapsed = Int63.(stop - start) in
-  elapsed, x
-;;
-
-let main args =
-  let { Args.width
-      ; height
-      ; spp
-      ; output
-      ; no_progress
-      ; max_bounces
-      ; no_simd = _
-      ; ganesha_ply
-      ; stop_after_bvh
-      }
-    =
-    args
-  in
+let main { Args.common; ganesha_ply; stop_after_bvh } =
+  let { Common_args.width; height; _ } = common in
   let camera = camera (width // height) in
   let ganesha_ply = load_ply_exn ganesha_ply in
   let mesh = Mesh.create ganesha_ply camera in
@@ -291,17 +237,12 @@ let main args =
     ;;
   end
   in
-  let img = mkImage width height in
-  let write_pixel ~x ~y color =
-    let r, g, b = Color.to_rgb color in
-    Image.set img x y 0 r;
-    Image.set img x y 1 g;
-    Image.set img x y 2 b
-  in
   let triangles : Triangle.t list = List.init (Array.length mesh.Mesh.faces) ~f:Fn.id in
   printf "dim = %d x %d;\n" width height;
   printf "#triangles = %d\n%!" (List.length triangles);
-  let elapsed, tree = with_elapsed_time (fun () -> Triangles.create triangles) in
+  let elapsed, tree =
+    Render_command.with_elapsed_time (fun () -> Triangles.create triangles)
+  in
   printf
     "tree depth = %d\nbuild time = %.3f ms\n%!"
     (Triangles.depth tree)
@@ -317,74 +258,30 @@ let main args =
     (* we don't support texture mapping yet, so just hard-coding this to green *)
     Material.lambertian (Texture.solid (Color.create ~r:0.0 ~g:0.7 ~b:0.1))
   in
-  let i =
-    let intersect r =
-      match Triangles.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value with
-      | None -> None
-      | Some tri_hit ->
-        let open Float.O in
-        let { Tri_hit.g_normal; pt; u; v; t_hit = _ } = tri_hit in
-        let hit_front = V3.dot (Ray.direction r) g_normal < 0.0 in
-        let normal = if hit_front then g_normal else V3.Infix.( ~- ) g_normal in
-        let ss = Shader_space.create normal pt in
-        let tex_coord = Texture.Coord.create u v in
-        let wi = Shader_space.omega_i ss r in
-        let do_scatter =
-          Material.scatter ganesha_material ss tex_coord ~omega_i:wi ~hit_front
-        in
-        Some { Hit.shader_space = ss; emit = Color.black; do_scatter }
-    in
-    Integrator.create
-      ~width
-      ~height
-      ~write_pixel
-      ~max_bounces
-      ~samples_per_pixel:spp
-      ~intersect
-      ~background
-      ~camera
-      ~diffuse_plus_light:Pdf.diffuse
+  let module Render_cmd =
+    Render_command.Make (struct
+      let background = background
+      let camera = camera
+
+      let intersect r =
+        match Triangles.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value with
+        | None -> None
+        | Some tri_hit ->
+          let open Float.O in
+          let { Tri_hit.g_normal; pt; u; v; t_hit = _ } = tri_hit in
+          let hit_front = V3.dot (Ray.direction r) g_normal < 0.0 in
+          let normal = if hit_front then g_normal else V3.Infix.( ~- ) g_normal in
+          let ss = Shader_space.create normal pt in
+          let tex_coord = Texture.Coord.create u v in
+          let wi = Shader_space.omega_i ss r in
+          let do_scatter =
+            Material.scatter ganesha_material ss tex_coord ~omega_i:wi ~hit_front
+          in
+          Some { Hit.shader_space = ss; emit = Color.black; do_scatter }
+      ;;
+    end)
   in
-  let elapsed =
-    fst
-    @@ with_elapsed_time (fun () ->
-           if no_progress
-           then Integrator.render i ~update_progress:ignore
-           else (
-             let total = Integrator.count_tiles i in
-             let p =
-               let open Progress.Line in
-               list
-                 [ spinner ()
-                 ; elapsed ()
-                 ; bar ~style:`ASCII total
-                 ; count_to total
-                 ; spacer 4
-                 ]
-             in
-             let module C = Domainslib.Chan in
-             let c = C.make_bounded 8 in
-             Progress.with_reporter p (fun report ->
-                 let update_progress () = C.send c 1 in
-                 let d =
-                   Caml.Domain.spawn (fun () ->
-                       let remaining = ref total in
-                       while !remaining > 0 do
-                         let m = C.recv c in
-                         remaining := !remaining - m;
-                         report m
-                       done)
-                 in
-                 Integrator.render i ~update_progress;
-                 Caml.Domain.join d)))
-  in
-  let () =
-    match Bimage_io.write output img with
-    | Ok () -> ()
-    | Error (`File_not_found f) -> printf "File not found: %s" f
-    | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other)
-  in
-  printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6)
+  Render_cmd.run common
 ;;
 
 let () = main (Args.parse ())

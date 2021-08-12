@@ -4,4 +4,4 @@
  (public_name ganesha)
  (preprocess
   (pps ppx_base))
- (libraries base stdio path_tracer ply_format bimage bimage-io progress))
+ (libraries base stdio path_tracer ply_format render_command))

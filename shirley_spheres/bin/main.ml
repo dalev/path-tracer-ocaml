@@ -2,54 +2,24 @@ open! Base
 open Stdio
 open Path_tracer
 open Sphere_lib
-module Image = Bimage.Image
+module Common_args = Render_command.Args
 
 module Args = struct
   type t =
-    { width : int
-    ; height : int
-    ; spp : int
-    ; output : string
-    ; no_progress : bool
+    { common : Common_args.t
     ; no_simd : bool
-    ; max_bounces : int
     }
 
   let parse () =
-    let width = ref 600 in
-    let height = ref 300 in
-    let spp = ref 1 in
-    let file = ref "output.png" in
-    let no_progress = ref false in
     let no_simd = ref false in
-    let max_bounces = ref 4 in
-    let usage_msg =
-      Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width !height !file
+    let common =
+      Common_args.parse
+        ~specs:[ "-no-simd", Set no_simd, "do not use SIMD accelerated intersection" ]
+        ()
     in
-    Caml.Arg.parse
-      [ "-width", Set_int width, "<integer> image width"
-      ; "-height", Set_int height, "<integer> image height"
-      ; "-samples-per-pixel", Set_int spp, "<integer> samples-per-pixel"
-      ; "-o", Set_string file, "<file> output file"
-      ; "-no-simd", Set no_simd, "do not use SIMD accelerated intersection"
-      ; "-no-progress", Set no_progress, "suppress progress monitor"
-      ; "-max-bounces", Set_int max_bounces, "<integer> max ray bounces"
-      ]
-      (fun (_ : string) -> failwith "No anonymous arguments expected")
-      usage_msg;
-    { width = !width
-    ; height = !height
-    ; spp = !spp
-    ; output = !file
-    ; no_progress = !no_progress
-    ; no_simd = !no_simd
-    ; max_bounces = !max_bounces
-    }
+    { common; no_simd = !no_simd }
   ;;
 end
-
-let color_space = Bimage.rgb
-let mkImage width height = Image.v Bimage.f64 color_space width height
 
 let camera aspect =
   let eye = P3.create ~x:13.0 ~y:2.0 ~z:4.5 in
@@ -260,16 +230,8 @@ end
 module type Spheres_S =
   Shape_tree.S with type elt := Sphere.t and type elt_hit := float * Sphere.t
 
-let with_elapsed_time f =
-  let start = Time_now.nanoseconds_since_unix_epoch () in
-  let x = f () in
-  let stop = Time_now.nanoseconds_since_unix_epoch () in
-  let elapsed = Int63.(stop - start) in
-  elapsed, x
-;;
-
-let main args =
-  let { Args.width; height; spp; output; no_progress; max_bounces; no_simd } = args in
+let main { Args.common; no_simd } =
+  let { Common_args.width; height; _ } = common in
   let leaf =
     if no_simd then (module Array_leaf : Leaf_S) else (module Simd_leaf : Leaf_S)
   in
@@ -292,13 +254,6 @@ let main args =
     ;;
   end
   in
-  let img = mkImage width height in
-  let write_pixel ~x ~y color =
-    let r, g, b = Color.to_rgb color in
-    Image.set img x y 0 r;
-    Image.set img x y 1 g;
-    Image.set img x y 2 b
-  in
   let spheres =
     Random.init 42;
     Shirley_spheres.spheres ()
@@ -310,70 +265,26 @@ let main args =
     let spheres =
       List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
     in
-    with_elapsed_time (fun () -> Spheres.create spheres)
+    Render_command.with_elapsed_time (fun () -> Spheres.create spheres)
   in
   printf "tree depth = %d\n" (Spheres.depth tree);
   printf "build time = %.3f ms\n" (Float.of_int63 elapsed *. 1e-6);
   printf
     "leaf lengths =\n%s\n%!"
     (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree));
-  let i =
-    let intersect r =
-      match Spheres.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value with
-      | None -> None
-      | Some (t_hit, sphere) -> Some (Sphere.hit sphere t_hit r)
-    in
-    Integrator.create
-      ~width
-      ~height
-      ~write_pixel
-      ~max_bounces
-      ~samples_per_pixel:spp
-      ~intersect
-      ~background
-      ~camera
-      ~diffuse_plus_light:Pdf.diffuse
+  let module Render_cmd =
+    Render_command.Make (struct
+      let camera = camera
+      let background = background
+
+      let intersect r =
+        match Spheres.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value with
+        | None -> None
+        | Some (t_hit, sphere) -> Some (Sphere.hit sphere t_hit r)
+      ;;
+    end)
   in
-  let elapsed =
-    fst
-    @@ with_elapsed_time (fun () ->
-           if no_progress
-           then Integrator.render i ~update_progress:ignore
-           else (
-             let total = Integrator.count_tiles i in
-             let p =
-               let open Progress.Line in
-               list
-                 [ spinner ()
-                 ; elapsed ()
-                 ; bar ~style:`ASCII total
-                 ; count_to total
-                 ; spacer 4
-                 ]
-             in
-             let module C = Domainslib.Chan in
-             let c = C.make_bounded 8 in
-             Progress.with_reporter p (fun report ->
-                 let update_progress () = C.send c 1 in
-                 let d =
-                   Caml.Domain.spawn (fun () ->
-                       let remaining = ref total in
-                       while !remaining > 0 do
-                         let m = C.recv c in
-                         remaining := !remaining - m;
-                         report m
-                       done)
-                 in
-                 Integrator.render i ~update_progress;
-                 Caml.Domain.join d)))
-  in
-  let () =
-    match Bimage_io.write output img with
-    | Ok () -> ()
-    | Error (`File_not_found f) -> printf "File not found: %s" f
-    | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other)
-  in
-  printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6)
+  Render_cmd.run common
 ;;
 
 let () = main (Args.parse ())

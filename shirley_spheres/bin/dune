@@ -4,15 +4,7 @@
  (name main)
  (preprocess
   (pps ppx_base))
- (libraries
-  path_tracer
-  sphere_lib
-  base
-  stdio
-  time_now
-  bimage
-  bimage-io
-  progress)
+ (libraries base path_tracer render_command sphere_lib stdio)
  (foreign_archives sphere_intersect))
 
 (rule
