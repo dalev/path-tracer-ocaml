@@ -16,8 +16,7 @@ let to_array t = to_array_map t ~f:Fn.id
 
 let fold_from t ~init ~f ~offset =
   let last_index = t.length - 1 in
-  let base_length = Array.length t.base in
-  assert (base_index t (Int.max offset last_index) < base_length);
+  assert (base_index t (Int.max offset last_index) < Array.length t.base);
   let acc = ref init in
   for i = offset to t.length - 1 do
     acc := f !acc (unsafe_get t i)
@@ -29,8 +28,7 @@ let fold = fold_from ~offset:0
 
 let iter t ~f =
   let last_index = t.offset + t.length - 1 in
-  let base_length = Array.length t.base in
-  assert (Int.max t.offset last_index < base_length);
+  assert (Int.max t.offset last_index < Array.length t.base);
   for i = t.offset to last_index do
     f (Array.unsafe_get t.base i)
   done
