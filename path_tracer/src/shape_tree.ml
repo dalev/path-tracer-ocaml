@@ -263,12 +263,7 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
   let create elts =
     if List.is_empty elts
     then failwith "Shape_tree.create: expected non-empty list of shapes";
-    let elts =
-      Sequence.of_list elts
-      |> Sequence.map ~f:(Bshape.create L.elt_bbox)
-      |> Sequence.to_array
-      |> Slice.create
-    in
+    let elts = Array.of_list_map elts ~f:(Bshape.create L.elt_bbox) |> Slice.create in
     let pool = Task.setup_pool ~num_additional_domains:7 in
     let bbox =
       let tasks =
