@@ -53,12 +53,7 @@ module V3 = struct
   let[@inline] max_coord { x; y; z } = Float.max x (Float.max y z)
 
   (* This inline is to reduce alloc in sphere intersect *)
-  let[@inline] dot v w =
-    let open Infix in
-    let { x; y; z } = v * w in
-    x +. y +. z
-  ;;
-
+  let[@inline] dot v w = Caml.Float.fma v.x w.x (Caml.Float.fma v.y w.y (v.z *. w.z))
   let[@inline] scale v s = map ~f:(( *. ) s) v
   let[@inline] quadrance v = dot v v
   let lerp t v w = Infix.( + ) (scale v (1.0 -. t)) (scale w t)
@@ -69,7 +64,7 @@ module V3 = struct
   ;;
 
   let cross { x = a; y = b; z = c } { x = d; y = e; z = f } =
-    let h w x y z = (w *. x) -. (y *. z) in
+    let h w x y z = Caml.Float.fma w x @@ Float.neg (y *. z) in
     { x = h b f c e; y = h c d a f; z = h a e b d }
   ;;
 end

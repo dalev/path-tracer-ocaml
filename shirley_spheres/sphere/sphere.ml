@@ -19,18 +19,16 @@ let bbox { center; radius; _ } =
 ;;
 
 let normal t pt = V3.normalize @@ V3.of_points ~src:t.center ~tgt:pt
+let one_over_pi = 1.0 /. Float.pi
+let one_over_two_pi = 1.0 /. (2.0 *. Float.pi)
 
 let tex_coord (_ : t) normal =
   let open Float.O in
   let { V3.x; y; z } = normal in
   let theta = Float.acos (-y) in
   let phi = Float.pi + Float.atan2 (-z) x in
-  let u = phi / (2.0 * Float.pi) in
-  let v = theta / Float.pi in
-  assert (0.0 <= u);
-  assert (u <= 1.);
-  assert (0.0 <= v);
-  assert (v <= 1.);
+  let u = phi * one_over_two_pi in
+  let v = theta * one_over_pi in
   Texture.Coord.create u v
 ;;
 
@@ -46,7 +44,7 @@ let intersect { center; radius; _ } ray ~t_min ~t_max =
   then None
   else (
     let sign_b' = Sign.to_float (Float.sign_exn b') in
-    let q = b' + (sign_b' * Float.sqrt (a * discrim)) in
+    let q = Caml.Float.fma sign_b' (Float.sqrt (a * discrim)) b' in
     let c = V3.quadrance f - r2 in
     let t_hit = if c > 0.0 then c / q else q / a in
     if t_min <= t_hit && t_hit <= t_max then Some t_hit else None)

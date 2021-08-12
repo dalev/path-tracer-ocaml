@@ -33,7 +33,8 @@ let longest_axis { min; max } =
 let surface_area { min; max } =
   let { P3.x; y; z } = P3.Infix.(max - min) in
   let open Float.O in
-  2.0 * ((x * y) + (y * z) + (z * x))
+  let a = Caml.Float.fma x y (Caml.Float.fma y z (z * x)) in
+  2.0 * a
 ;;
 
 let[@inline] hit_range t ray ~t_min ~t_max =
