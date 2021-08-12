@@ -244,9 +244,10 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
     Render_command.with_elapsed_time (fun () -> Triangles.create triangles)
   in
   printf
-    "tree depth = %d\nbuild time = %.3f ms\n%!"
+    "tree depth = %d\nbuild time = %.3f ms\nreachable words = %d\n%!"
     (Triangles.depth tree)
-    (Float.of_int63 elapsed *. 1e-6);
+    (Float.of_int63 elapsed *. 1e-6)
+    (Caml.Obj.reachable_words @@ Caml.Obj.repr tree);
   printf
     "leaf lengths =\n%s\n%!"
     (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree));
