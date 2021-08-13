@@ -59,7 +59,7 @@ module V3 = struct
   let lerp t v w = Infix.( + ) (scale v (1.0 -. t)) (scale w t)
 
   let normalize v =
-    let scalar = 1.0 /. Float.sqrt (quadrance v) in
+    let scalar = 1.0 /. Float.hypot v.x (Float.hypot v.y v.z) in
     scale v scalar
   ;;
 

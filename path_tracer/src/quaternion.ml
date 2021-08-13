@@ -9,14 +9,14 @@ let create r v = { r; v }
 let id = { r = 1.0; v = V3.zero }
 
 let normalize { r; v } =
-  let open Float.O in
-  let s = 1.0 / Float.sqrt ((r * r) + V3.quadrance v) in
-  { r = r * s; v = V3.scale v s }
+  let { V3.x; y; z } = v in
+  let s = 1.0 /. Float.hypot (Float.hypot r x) (Float.hypot y z) in
+  { r = r *. s; v = V3.scale v s }
 ;;
 
 let rotation axis angle =
   let axis = V3.normalize axis in
-  let half_angle = angle /. 2.0 in
+  let half_angle = angle *. 0.5 in
   let r = Float.cos half_angle in
   let v = V3.scale axis (Float.sin half_angle) in
   normalize { r; v }
