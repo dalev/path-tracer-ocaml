@@ -42,12 +42,20 @@ let background =
     Color.lerp t Color.white escape_color
 ;;
 
+module Face = struct
+  type t =
+    { a : int
+    ; b : int
+    ; c : int
+    }
+end
+
 module Mesh = struct
   type t =
     { xs : floatarray
     ; ys : floatarray
     ; zs : floatarray
-    ; faces : int array array
+    ; faces : Face.t array
     }
 
   let floats_exn : Ply.Data.Column.t -> floatarray = function
@@ -84,6 +92,17 @@ module Mesh = struct
       FArray.set ys i y;
       FArray.set zs i z
     done;
+    let faces =
+      let num_vertices = fst3 lengths in
+      let in_bounds a = a >= 0 && a < num_vertices in
+      Array.map faces ~f:(fun face ->
+          match face with
+          | [| a; b; c |] ->
+            if in_bounds a && in_bounds b && in_bounds c
+            then { Face.a; b; c }
+            else failwith "face vertex index out of bounds"
+          | _ -> failwith "expected triangular faces")
+    in
     { xs; ys; zs; faces }
   ;;
 end
@@ -104,25 +123,23 @@ module Make_triangle (M : sig
   val mesh : Mesh.t
 end) =
 struct
-  type t = int (* index into faces *)
+  type t = Face.t
 
   let xs = M.mesh.Mesh.xs
   let ys = M.mesh.Mesh.ys
   let zs = M.mesh.Mesh.zs
-  let faces = M.mesh.Mesh.faces
 
-  let vertex t j =
-    let i = faces.(t).(j) in
-    let x = FArray.get xs i in
-    let y = FArray.get ys i in
-    let z = FArray.get zs i in
+  let point i =
+    let x = FArray.unsafe_get xs i in
+    let y = FArray.unsafe_get ys i in
+    let z = FArray.unsafe_get zs i in
     P3.create ~x ~y ~z
   ;;
 
+  let[@inline] vertices t = point t.Face.a, point t.Face.b, point t.Face.c
+
   let bbox t =
-    let a = vertex t 0 in
-    let b = vertex t 1 in
-    let c = vertex t 2 in
+    let a, b, c = vertices t in
     let lo = P3.map2 ~f:Float.min in
     let hi = P3.map2 ~f:Float.max in
     Bbox.create ~min:(lo (lo a b) c) ~max:(hi (hi a b) c)
@@ -130,9 +147,7 @@ struct
 
   let intersect t r ~t_min ~t_max =
     let epsilon = 1e-6 in
-    let a = vertex t 0
-    and b = vertex t 1
-    and c = vertex t 2 in
+    let a, b, c = vertices t in
     let e1 = V3.of_points ~tgt:b ~src:a in
     let e2 = V3.of_points ~tgt:c ~src:a in
     let dir = Ray.direction r in
@@ -234,7 +249,7 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
     ;;
   end
   in
-  let triangles : Triangle.t list = List.init (Array.length mesh.Mesh.faces) ~f:Fn.id in
+  let triangles : Triangle.t list = Array.to_list mesh.Mesh.faces in
   printf "dim = %d x %d;\n" width height;
   printf "#triangles = %d\n%!" (List.length triangles);
   let elapsed, tree =
