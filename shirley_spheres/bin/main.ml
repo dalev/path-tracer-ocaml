@@ -1,7 +1,6 @@
 open! Base
 open Stdio
 open Path_tracer
-open Sphere_lib
 module Common_args = Render_command.Args
 
 module Args = struct
