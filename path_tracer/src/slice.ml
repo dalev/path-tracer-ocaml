@@ -36,7 +36,9 @@ let iter t ~f =
 
 let map_reduce t ~transform ~combine =
   let init = transform (get t 0) in
-  fold_from t ~init ~offset:1 ~f:(fun acc item -> combine acc (transform item))
+  if t.length > 1
+  then fold_from t ~init ~offset:1 ~f:(fun acc item -> combine acc (transform item))
+  else init
 ;;
 
 let reduce_exn t ~f = map_reduce t ~transform:Fn.id ~combine:f

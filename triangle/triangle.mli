@@ -6,6 +6,8 @@ module Make (Face : sig
 
   val vertices : t -> P3.t * P3.t * P3.t
 end) : sig
+  type t
+
   module Hit : sig
     type t
 
@@ -13,9 +15,8 @@ end) : sig
     val g_normal : t -> V3.t
     val point : t -> P3.t
     val tex_coord : t -> Texture.Coord.t
+    val face : t -> Face.t
   end
-
-  type t
 
   val create : Face.t -> t
   val bbox : t -> Bbox.t

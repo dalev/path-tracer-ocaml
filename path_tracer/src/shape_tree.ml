@@ -124,26 +124,31 @@ module Proposal = struct
   let propose_split_one_axis shapes axis cbbox =
     let num_bins = 32 in
     let to_axis = P3.axis axis in
-    let to_bin =
-      let epsilon = 1e-6 in
-      let cb_min = to_axis (Bbox.min cbbox) in
-      let cb_max = to_axis (Bbox.max cbbox) in
-      let scale = Float.of_int num_bins *. (1.0 -. epsilon) /. (cb_max -. cb_min) in
-      fun b -> Float.to_int (scale *. (to_axis (Bshape.centroid b) -. cb_min))
-    in
-    let bins = Array.init num_bins ~f:(fun (_ : int) -> Bin.create ()) in
-    Slice.iter shapes ~f:(fun s -> Bin.insert bins.(to_bin s) s);
-    Bin.populate_bbox_r bins;
-    Bin.populate_bbox_l bins;
-    candidates bins to_bin axis |> List.min_elt ~compare
+    let open Float.O in
+    let epsilon = 1e-6 in
+    let cb_min = to_axis (Bbox.min cbbox) in
+    let cb_max = to_axis (Bbox.max cbbox) in
+    let scale = Float.of_int num_bins * (1.0 - epsilon) / (cb_max - cb_min) in
+    if not (Float.is_finite scale)
+    then None
+    else (
+      let to_bin b = Float.to_int (scale * (to_axis (Bshape.centroid b) - cb_min)) in
+      let bins = Array.init num_bins ~f:(fun (_ : int) -> Bin.create ()) in
+      Slice.iter shapes ~f:(fun s -> Bin.insert bins.(to_bin s) s);
+      Bin.populate_bbox_r bins;
+      Bin.populate_bbox_l bins;
+      candidates bins to_bin axis |> List.min_elt ~compare)
   ;;
 
   let create shapes =
     let cbbox = Bshape.centroid_bbox shapes in
-    let candidates =
-      List.filter_map Axis.all ~f:(fun axis -> propose_split_one_axis shapes axis cbbox)
-    in
-    List.min_elt candidates ~compare
+    match
+      List.min_elt ~compare
+      @@ List.filter_map Axis.all ~f:(fun axis ->
+             propose_split_one_axis shapes axis cbbox)
+    with
+    | v -> v
+    | exception e -> Exn.reraisef e "shapes len = %d" (Slice.length shapes) ()
   ;;
 end
 

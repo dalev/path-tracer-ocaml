@@ -1,0 +1,7 @@
+(executable
+ (name main)
+ (public_name cornell_box)
+ (package path_tracer)
+ (preprocess
+  (pps ppx_base ppx_sexp_message))
+ (libraries base stdio path_tracer render_command sphere triangle))

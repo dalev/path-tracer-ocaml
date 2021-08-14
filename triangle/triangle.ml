@@ -38,6 +38,7 @@ struct
     ;;
 
     let tex_coord t = Texture.Coord.create t.u t.v
+    let face t = t.tri
   end
 
   let bbox t =
