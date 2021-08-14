@@ -13,8 +13,13 @@ end
 module Triangle = struct
   include Triangle.Make (Face)
 
-  let create ~material a b c = create { Face.material; vertices = a, b, c }
+  let create ~material a b c = { Face.material; vertices = a, b, c }
   let material t = t.Face.material
+
+  let transform t ~f =
+    let a, b, c = Face.vertices t in
+    { t with vertices = f a, f b, f c }
+  ;;
 end
 
 let triangle_fan ~material pts =
@@ -37,7 +42,7 @@ let quad ~material a u v =
   triangle_fan ~material [ a; b; c; d ]
 ;;
 
-let empty_box =
+let empty_box () =
   let solid r g b = Material.lambertian (Texture.solid (Color.create ~r ~g ~b)) in
   let red = solid 0.7 0.0 0.0 in
   let blue = solid 0.0 0.0 0.7 in
@@ -72,8 +77,11 @@ end))
 
 let main argv =
   let { Render_command.Args.width; height; _ } = argv in
-  let tree = Shape_tree.create empty_box in
   let camera = camera ~aspect:(width // height) in
+  let tree =
+    let f = Camera.transform camera in
+    Shape_tree.create @@ List.map (empty_box ()) ~f:(fun t -> Triangle.transform t ~f)
+  in
   let module Render_cmd =
     Render_command.Make (struct
       let camera = camera

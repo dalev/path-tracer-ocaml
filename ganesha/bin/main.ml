@@ -173,7 +173,7 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
   in
   let triangles : Triangle.t list =
     let f = function
-      | [| a; b; c |] -> Triangle.create { Triangle.Face.a; b; c }
+      | [| a; b; c |] -> { Triangle.Face.a; b; c }
       | _ -> failwith "expected triangular face"
     in
     Array.to_list @@ Array.map ~f mesh.Mesh.faces

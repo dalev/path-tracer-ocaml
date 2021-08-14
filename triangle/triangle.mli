@@ -6,7 +6,7 @@ module Make (Face : sig
 
   val vertices : t -> P3.t * P3.t * P3.t
 end) : sig
-  type t
+  type t = Face.t
 
   module Hit : sig
     type t
@@ -18,7 +18,6 @@ end) : sig
     val face : t -> Face.t
   end
 
-  val create : Face.t -> t
   val bbox : t -> Bbox.t
   val intersect : t -> Ray.t -> t_min:float -> t_max:float -> Hit.t option
 end

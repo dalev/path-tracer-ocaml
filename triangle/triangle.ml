@@ -9,8 +9,6 @@ end) =
 struct
   include Face
 
-  let create = Fn.id
-
   module Hit = struct
     type t =
       { t_hit : float
