@@ -28,8 +28,8 @@ let triangle_fan ~material pts =
   let tri = Triangle.create ~material in
   let rec loop pts tris =
     match pts with
-    | [] | [ _ ] -> failwith "BUG: triangle_fan"
-    | [ a; b ] -> tri o a b :: tris
+    | [] -> failwith "BUG: triangle_fan"
+    | [ _ ] -> tris
     | a :: (b :: _ as tl) -> loop tl (tri o a b :: tris)
   in
   loop (List.tl_exn pts) []
@@ -38,7 +38,7 @@ let triangle_fan ~material pts =
 let quad ~material a u v =
   let b = P3.translate a v in
   let c = P3.translate b u in
-  let d = P3.translate c V3.Infix.(~-v) in
+  let d = P3.translate a u in
   triangle_fan ~material [ a; b; c; d ]
 ;;
 
