@@ -110,34 +110,22 @@ let background =
 module type Leaf_S =
   Shape_tree.Leaf with type elt = Sphere.t and type elt_hit = float * Sphere.t
 
-module Array_leaf : Leaf_S = struct
-  type t = Sphere.t array
-  type elt = Sphere.t
-  type elt_hit = float * elt
+module Array_leaf : Leaf_S = Shape_tree.Array_leaf (struct
+  include Sphere
 
-  let elt_hit_t = fst
+  type hit = float * Sphere.t
+
+  let hit_t = fst
   let length_cutoff = 8
-  let of_elts = Fn.id
-  let elt_bbox = Sphere.bbox
   let depth _ = 0
-  let length = Array.length
+  let length _ = 1
 
   let intersect t ray ~t_min ~t_max =
-    let t_max = ref t_max in
-    let item = ref None in
-    for i = 0 to Array.length t - 1 do
-      let s = t.(i) in
-      match Sphere.intersect s ray ~t_min ~t_max:!t_max with
-      | None -> ()
-      | Some t_hit ->
-        item := Some s;
-        t_max := t_hit
-    done;
-    match !item with
+    match Sphere.intersect t ray ~t_min ~t_max with
     | None -> None
-    | Some s -> Some (!t_max, s)
+    | Some hit_t -> Some (hit_t, t)
   ;;
-end
+end)
 
 module Simd_leaf : Leaf_S = struct
   module FArray = Caml.Float.Array

@@ -176,38 +176,6 @@ struct
   ;;
 end
 
-module Make_array_leaf (Elt : sig
-  type t
-
-  val bbox : t -> Bbox.t
-  val intersect : t -> Ray.t -> t_min:float -> t_max:float -> Tri_hit.t option
-end) : Shape_tree.Leaf with type elt = Elt.t and type elt_hit = Tri_hit.t = struct
-  type t = Elt.t array
-  type elt = Elt.t
-  type elt_hit = Tri_hit.t
-
-  let elt_hit_t = Tri_hit.t_hit
-  let length_cutoff = 8
-  let of_elts = Fn.id
-  let elt_bbox = Elt.bbox
-  let depth _ = 0
-  let length = Array.length
-
-  let intersect t ray ~t_min ~t_max =
-    let t_max = ref t_max in
-    let item = ref None in
-    for i = 0 to Array.length t - 1 do
-      let s = t.(i) in
-      match Elt.intersect s ray ~t_min ~t_max:!t_max with
-      | None -> ()
-      | Some tri_hit as some_tri_hit ->
-        item := some_tri_hit;
-        t_max := Tri_hit.t_hit tri_hit
-    done;
-    !item
-  ;;
-end
-
 let load_ply_exn path =
   let shared = false in
   let fd = Unix.openfile path [ O_RDONLY ] 0o600 in
@@ -230,7 +198,18 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
       let mesh = mesh
     end)
   in
-  let module Leaf = Make_array_leaf (Triangle) in
+  let module Leaf =
+    Shape_tree.Array_leaf (struct
+      include Triangle
+
+      type hit = Tri_hit.t
+
+      let hit_t = Tri_hit.t_hit
+      let length_cutoff = 8
+      let depth _ = 0
+      let length _ = 1
+    end)
+  in
   let module Triangles = Shape_tree.Make (Leaf) in
   let module Leaf_lengths = struct
     type s =

@@ -278,3 +278,50 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
     { root }
   ;;
 end
+
+module Array_leaf (Elt : sig
+  type t
+  type hit
+
+  val hit_t : hit -> float
+  val length_cutoff : int
+  val bbox : t -> Bbox.t
+  val length : t -> int
+  val depth : t -> int
+  val intersect : t -> Ray.t -> t_min:float -> t_max:float -> hit option
+end) : Leaf with type elt = Elt.t and type elt_hit = Elt.hit = struct
+  type elt = Elt.t
+  type t = Elt.t array
+  type elt_hit = Elt.hit
+
+  let elt_hit_t = Elt.hit_t
+  let length_cutoff = Elt.length_cutoff
+
+  let of_elts es =
+    assert (not (Array.is_empty es));
+    es
+  ;;
+
+  let elt_bbox = Elt.bbox
+  let length t = Array.sum (module Int) t ~f:Elt.length
+
+  let depth t =
+    match Array.max_elt (Array.map t ~f:Elt.depth) ~compare:Int.compare with
+    | Some d -> 1 + d
+    | None -> failwith "BUG: array leaf is empty"
+  ;;
+
+  let intersect t ray ~t_min ~t_max =
+    let t_max = ref t_max in
+    let item = ref None in
+    for i = 0 to Array.length t - 1 do
+      let s = t.(i) in
+      match Elt.intersect s ray ~t_min ~t_max:!t_max with
+      | None -> ()
+      | Some hit as some_hit ->
+        item := some_hit;
+        t_max := Elt.hit_t hit
+    done;
+    !item
+  ;;
+end
