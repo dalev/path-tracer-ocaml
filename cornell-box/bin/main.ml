@@ -78,7 +78,23 @@ let spheres () =
   [ metal; glass ]
 ;;
 
-module Shape = struct
+module Shape : sig
+  type t
+
+  val of_triangle : Triangle.t -> t
+  val of_sphere : Sphere.t -> t
+  val bbox : t -> Bbox.t
+  val transform : t -> f:(P3.t -> P3.t) -> t
+
+  module Hit : sig
+    type t
+
+    val t_hit : t -> float
+    val to_scatter : t -> Ray.t -> Hit.t
+  end
+
+  val intersect : t -> Ray.t -> t_min:float -> t_max:float -> Hit.t option
+end = struct
   type t =
     | S of Sphere.t
     | T of Triangle.t
