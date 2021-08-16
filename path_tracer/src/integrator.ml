@@ -92,15 +92,12 @@ let create
 let gamma = Color.map ~f:Float.sqrt
 
 let render_tile t tile tile_sampler =
-  let x0 = tile.Tile.col in
-  let y0 = tile.Tile.row in
   let widthf = 1 // t.width in
   let heightf = 1 // t.height in
   let spp_invf = 1 // t.samples_per_pixel in
   let sampler = ref tile_sampler in
-  for y = y0 to y0 + tile.Tile.height - 1 do
-    let yf = Float.of_int (t.height - 1 - y) in
-    for x = x0 to x0 + tile.Tile.width - 1 do
+  Tile.iter tile ~f:(fun ~x ~y ->
+      let yf = Float.of_int (t.height - 1 - y) in
       let xf = Float.of_int x in
       let color = ref Color.black in
       for _ = 1 to t.samples_per_pixel do
@@ -113,9 +110,7 @@ let render_tile t tile tile_sampler =
         let cy = (yf +. dy) *. heightf in
         color := Color.Infix.( + ) !color @@ t.trace_path ~cx ~cy t.max_bounces s
       done;
-      t.write_pixel ~x ~y @@ gamma (Color.scale !color spp_invf)
-    done
-  done
+      t.write_pixel ~x ~y @@ gamma (Color.scale !color spp_invf))
 ;;
 
 let create_tile_samplers t tiles =

@@ -24,4 +24,5 @@ module type S = sig
   val length : t -> int
   val intersect : t -> Ray.t -> t_min:float -> t_max:float -> elt_hit option
   val leaf_length_histogram : t -> (int, int) Hashtbl.t
+  val bbox : t -> Bbox.t
 end

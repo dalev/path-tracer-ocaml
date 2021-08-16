@@ -184,26 +184,28 @@ let main argv =
     in
     Shape_tree.create @@ List.map shapes ~f:(fun t -> Shape.transform t ~f)
   in
-  let module Render_cmd =
-    Render_command.Make (struct
-      let camera = camera
+  let module Scene = struct
+    let width = width
+    let height = height
+    let camera = camera
+    let num_iterations = argv.Render_command.Args.samples_per_pixel
+    let max_bounces = argv.Render_command.Args.max_bounces
+    let bbox = Shape_tree.bbox tree
 
-      let background =
-        let escape_color = Color.create ~r:0.5 ~g:0.7 ~b:1.0 in
-        fun ray ->
-          let d = V3.normalize (Ray.direction ray) in
-          let t = 0.5 *. (V3.dot d V3.unit_y +. 1.0) in
-          Color.lerp t Color.white escape_color
-      ;;
+    let point_lights =
+      let position = Camera.transform camera (P3.create ~x:0.5 ~y:0.95 ~z:0.5) in
+      [ Ppm.Point_light.create ~position ]
+    ;;
 
-      let intersect ray =
-        match Shape_tree.intersect tree ray ~t_min:0.0 ~t_max:Float.max_finite_value with
-        | None -> None
-        | Some h -> Some (Shape.Hit.to_scatter h ray)
-      ;;
-    end)
+    let intersect ray =
+      match Shape_tree.intersect tree ray ~t_min:0.0 ~t_max:Float.max_finite_value with
+      | None -> None
+      | Some h -> Some (Shape.Hit.to_scatter h ray)
+    ;;
+  end
   in
-  Render_cmd.run argv
+  let module Ppm = Ppm.Make (Scene) in
+  Ppm.go ()
 ;;
 
 let () = main @@ Render_command.Args.parse ()

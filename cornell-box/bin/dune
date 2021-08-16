@@ -4,4 +4,16 @@
  (package path_tracer)
  (preprocess
   (pps ppx_base ppx_sexp_message))
- (libraries base stdio path_tracer render_command sphere triangle))
+ (libraries
+  base
+  stdio
+  path_tracer
+  render_command
+  sphere
+  triangle
+  ;; CR dalev: factor these out later:
+  bimage
+  bimage-io
+  domainslib
+  progress
+  time_now))

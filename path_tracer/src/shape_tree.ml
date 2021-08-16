@@ -166,6 +166,11 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
           ; rhs : t
           }
 
+    let bbox = function
+      | Leaf { bbox; _ } -> bbox
+      | Branch { bbox; _ } -> bbox
+    ;;
+
     let rec cata t ~branch ~leaf =
       match t with
       | Leaf { leaf = l; _ } -> leaf l
@@ -239,6 +244,7 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
 
   type t = { root : Tree.t }
 
+  let bbox t = Tree.bbox t.root
   let cata t = Tree.cata t.root
   let length = cata ~branch:( + ) ~leaf:L.length
   let depth = cata ~branch:(fun l r -> 1 + max l r) ~leaf:L.depth

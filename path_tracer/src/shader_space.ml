@@ -21,6 +21,7 @@ let create normal origin =
   { rotation; origin }
 ;;
 
+let world_origin t = t.origin
 let rotate t v = Quaternion.transform t.rotation v
 
 let rotate_inv t v =
