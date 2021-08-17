@@ -40,6 +40,14 @@ module Hit_point = struct
   let create ~shader_space ~pixel ~beta = { shader_space; pixel; beta }
 end
 
+module Kd_tree = Kd_tree.Make (struct
+  include Hit_point
+
+  let x = Fn.compose P3.x point
+  let y = Fn.compose P3.y point
+  let z = Fn.compose P3.z point
+end)
+
 module Pixel_stat = struct
   type t =
     { mutable radius2 : float
@@ -149,8 +157,11 @@ struct
           | Diffuse color ->
             let ss = Hit.shader_space h in
             let flux = Color.Infix.(flux * color) in
-            (* CR dalev: build a kd-tree of hit_points to accelerate this search *)
-            List.iter hit_points ~f:(fun hp ->
+            Kd_tree.search
+              hit_points
+              ~center:(Shader_space.world_origin ss)
+              ~radius2:init_radius2
+              ~f:(fun hp ->
                 let hp_ss = Hit_point.shader_space hp in
                 let dp =
                   V3.dot (Shader_space.world_normal hp_ss) (Shader_space.world_normal ss)
@@ -205,8 +216,17 @@ struct
           s := suffix;
           Task.async pool (fun () -> collect_hit_points tile sampler))
     in
-    let hit_pts = List.concat_map tasks ~f:(Task.await pool) in
-    printf "Found %d hit points\n%!" (List.length hit_pts);
+    let hit_pts =
+      let pts = List.map tasks ~f:(Task.await pool) in
+      let len = List.sum (module Int) pts ~f:List.length in
+      let a = Array.create ~len (List.hd_exn (List.hd_exn pts)) in
+      let i = ref 0 in
+      List.iter pts ~f:(fun pts ->
+          List.iter pts ~f:(fun p ->
+              a.(!i) <- p;
+              Int.incr i));
+      Kd_tree.create a
+    in
     let sampler = ref @@ L.create ~dimension:(2 + (2 * (max_bounces + 1))) in
     let open L.Sample in
     List.iter point_lights ~f:(fun light ->

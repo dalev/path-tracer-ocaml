@@ -5,6 +5,7 @@ type p3 =
   ; y : float
   ; z : float
   }
+[@@deriving sexp_of]
 
 module V3 : sig
   type t =
@@ -52,6 +53,7 @@ module P3 : sig
     ; y : float
     ; z : float
     }
+  [@@deriving sexp_of]
 
   val pp : Caml.Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
   val create : x:float -> y:float -> z:float -> t

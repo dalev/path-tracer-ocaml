@@ -5,6 +5,7 @@ type p3 =
   ; y : float
   ; z : float
   }
+[@@deriving sexp_of]
 
 let to_string { x; y; z } = Printf.sprintf "(%f, %f, %f)" x y z
 let pp f t = Caml.Format.pp_print_string f (to_string t)
@@ -15,6 +16,7 @@ module V3 = struct
     ; y : float
     ; z : float
     }
+  [@@deriving sexp_of]
 
   let pp = pp
   let create ~x ~y ~z : t = { x; y; z }

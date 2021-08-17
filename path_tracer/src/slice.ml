@@ -44,20 +44,24 @@ let map_reduce t ~transform ~combine =
 let reduce_exn t ~f = map_reduce t ~transform:Fn.id ~combine:f
 
 let split_at t i =
+  if i >= t.length
+  then raise_s [%message "split_at" ~index:(i : int) ~length:(t.length : int)];
   assert (i < t.length);
   let lhs = { t with length = i } in
   let rhs = { t with offset = t.offset + i; length = t.length - i } in
   lhs, rhs
 ;;
 
+let tail t = snd @@ (split_at [@inlined]) t 1
+
 let partition_in_place t ~on_lhs =
   let i = ref 0 in
   let j = ref (length t - 1) in
   while !i < !j do
-    while on_lhs (get t !i) do
+    while on_lhs (get t !i) && !i < !j do
       Int.incr i
     done;
-    while not @@ on_lhs (get t !j) do
+    while (not @@ on_lhs (get t !j)) && !j >= 0 do
       Int.decr j
     done;
     if !i < !j then Array.swap t.base (base_index t !i) (base_index t !j)
