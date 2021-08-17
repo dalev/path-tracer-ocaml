@@ -185,7 +185,7 @@ module Make (L : Leaf) = struct
       Leaf { bbox; leaf = L.of_elts (Slice.to_array_map shapes ~f:Bshape.shape) }
     ;;
 
-    let create pool bbox shapes =
+    let create ?pool bbox shapes =
       let rec loop bbox shapes ~depth =
         if Slice.length shapes <= L.length_cutoff
         then make_leaf bbox shapes
@@ -205,11 +205,11 @@ module Make (L : Leaf) = struct
               let depth = Int.O.(depth + 1) in
               let do_rhs =
                 let thunk () = loop rhs_box r ~depth in
-                if not spawn_rhs
-                then thunk
-                else (
+                match pool with
+                | Some pool when spawn_rhs ->
                   let t = Task.async pool thunk in
-                  fun () -> Task.await pool t)
+                  fun () -> Task.await pool t
+                | _ -> thunk
               in
               let lhs = loop (Proposal.lhs_box p) l ~depth in
               let rhs = do_rhs () in
@@ -287,21 +287,21 @@ module Make (L : Leaf) = struct
     loop slice []
   ;;
 
-  let create elts =
+  let create ?pool elts =
     if List.is_empty elts
     then failwith "Shape_tree.create: expected non-empty list of shapes";
     let elts = Array.of_list_map elts ~f:(Bshape.create L.elt_bbox) |> Slice.create in
-    let pool = Task.setup_pool ~num_additional_domains:7 in
     let bbox =
-      let tasks =
-        List.map (chunks elts) ~f:(fun s ->
-            Task.async pool (fun () ->
-                Slice.map_reduce s ~transform:Bshape.bbox ~combine:Bbox.union))
-      in
-      List.map tasks ~f:(Task.await pool) |> List.reduce_exn ~f:Bbox.union
+      let slice_bbox = Slice.map_reduce ~transform:Bshape.bbox ~combine:Bbox.union in
+      match pool with
+      | None -> slice_bbox elts
+      | Some pool ->
+        let tasks =
+          List.map (chunks elts) ~f:(fun s -> Task.async pool (fun () -> slice_bbox s))
+        in
+        List.map tasks ~f:(Task.await pool) |> List.reduce_exn ~f:Bbox.union
     in
-    let root = Tree.create pool bbox elts in
-    Task.teardown_pool pool;
+    let root = Tree.create ?pool bbox elts in
     { root }
   ;;
 end

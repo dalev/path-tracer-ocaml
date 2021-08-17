@@ -65,7 +65,10 @@ module Make (Scene : sig
   val background : Ray.t -> Color.t
 end) =
 struct
-  let run { Args.width; height; max_bounces; samples_per_pixel; no_progress; output } =
+  let run
+      ?pool
+      { Args.width; height; max_bounces; samples_per_pixel; no_progress; output }
+    =
     let img = mkImage width height in
     let write_pixel ~x ~y color =
       let r, g, b = Color.to_rgb color in
@@ -89,7 +92,7 @@ struct
       fst
       @@ with_elapsed_time (fun () ->
              if no_progress
-             then Integrator.render i ~update_progress:ignore
+             then Integrator.render i ?pool ~update_progress:ignore
              else (
                let total = Integrator.count_tiles i in
                let p =

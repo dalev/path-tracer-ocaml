@@ -180,8 +180,9 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
   in
   printf "dim = %d x %d;\n" width height;
   printf "#triangles = %d\n%!" (List.length triangles);
+  let pool = Domainslib.Task.setup_pool ~num_additional_domains:7 in
   let elapsed, tree =
-    Render_command.with_elapsed_time (fun () -> Triangles.create triangles)
+    Render_command.with_elapsed_time (fun () -> Triangles.create ~pool triangles)
   in
   printf
     "tree depth = %d\nbuild time = %.3f ms\nreachable words = %d\n%!"
@@ -224,7 +225,8 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
       ;;
     end)
   in
-  Render_cmd.run common
+  Render_cmd.run ~pool common;
+  Domainslib.Task.teardown_pool pool
 ;;
 
 let () = main (Args.parse ())
