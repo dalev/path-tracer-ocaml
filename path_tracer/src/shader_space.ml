@@ -3,6 +3,7 @@ open Base
 type t =
   { rotation : Quaternion.t
   ; origin : P3.t
+  ; normal : V3.t
   }
 
 let epsilon = 1e-9
@@ -18,10 +19,11 @@ let create normal origin =
     else
       Quaternion.normalize @@ Quaternion.create (1.0 + z) (V3.create ~x:y ~y:(-x) ~z:0.0)
   in
-  { rotation; origin }
+  { rotation; origin; normal }
 ;;
 
 let world_origin t = t.origin
+let world_normal t = t.normal
 let rotate t v = Quaternion.transform t.rotation v
 
 let rotate_inv t v =

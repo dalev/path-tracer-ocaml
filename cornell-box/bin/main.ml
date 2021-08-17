@@ -205,7 +205,11 @@ let main argv =
   end
   in
   let module Ppm = Ppm.Make (Scene) in
-  Ppm.go ()
+  let img = Ppm.go () in
+  match Bimage_io.write "output.png" img with
+  | Ok () -> ()
+  | Error (`File_not_found s) -> failwith @@ "file not found: " ^ s
+  | Error (#Bimage.Error.t as e) -> Bimage.Error.exc e
 ;;
 
 let () = main @@ Render_command.Args.parse ()
