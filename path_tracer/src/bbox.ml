@@ -54,3 +54,11 @@ let is_hit t ray ~t_min ~t_max =
   let a, b = (hit_range [@inlined]) t ray ~t_min ~t_max in
   Float.( <= ) a b
 ;;
+
+let mem t p =
+  let[@inline] leq f =
+    let m = f p in
+    Float.O.(f t.min <= m && m <= f t.max)
+  in
+  leq P3.x && leq P3.y && leq P3.z
+;;

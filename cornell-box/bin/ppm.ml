@@ -40,14 +40,6 @@ module Hit_point = struct
   let create ~shader_space ~pixel ~beta = { shader_space; pixel; beta }
 end
 
-module Kd_tree = Kd_tree.Make (struct
-  include Hit_point
-
-  let x = Fn.compose P3.x point
-  let y = Fn.compose P3.y point
-  let z = Fn.compose P3.z point
-end)
-
 module Pixel_stat = struct
   type t =
     { mutable radius2 : float
@@ -136,6 +128,25 @@ struct
     Array.init (width * height) ~f:(fun _ -> Pixel_stat.create ~radius2:init_radius2)
   ;;
 
+  module Kd_tree = Kd_tree.Make (struct
+    include Hit_point
+
+    let x = Fn.compose P3.x point
+    let y = Fn.compose P3.y point
+    let z = Fn.compose P3.z point
+
+    let bbox t =
+      let x, y = t.pixel in
+      let radius2 = Pixel_stat.radius2 pixel_stats.((y * width) + x) in
+      let radius = Float.sqrt radius2 in
+      let center = point t in
+      let offset = V3.create ~x:radius ~y:radius ~z:radius in
+      let max = P3.translate center offset
+      and min = P3.translate center V3.Infix.(~-offset) in
+      Bbox.create ~min ~max
+    ;;
+  end)
+
   let trace_photon hit_points light ray sample =
     let sample_idx = ref 1 in
     let u () =
@@ -157,15 +168,8 @@ struct
           | Diffuse color ->
             let ss = Hit.shader_space h in
             let flux = Color.Infix.(flux * color) in
-            Kd_tree.search
-              hit_points
-              ~center:(Shader_space.world_origin ss)
-              ~radius2:init_radius2
-              ~f:(fun hp ->
+            Kd_tree.search hit_points ~center:(Shader_space.world_origin ss) ~f:(fun hp ->
                 let hp_ss = Hit_point.shader_space hp in
-                let dp =
-                  V3.dot (Shader_space.world_normal hp_ss) (Shader_space.world_normal ss)
-                in
                 let w =
                   V3.of_points
                     ~tgt:(Shader_space.world_origin hp_ss)
@@ -184,6 +188,9 @@ struct
                   else pixel_stats.(i)
                 in
                 let radius2 = Pixel_stat.radius2 pixel_stat in
+                let dp =
+                  V3.dot (Shader_space.world_normal hp_ss) (Shader_space.world_normal ss)
+                in
                 let open Float.O in
                 if dp >= 1e-3 && V3.quadrance w <= radius2
                 then (

@@ -1,6 +1,7 @@
 open! Base
 module P3 = Path_tracer.P3
 module V3 = Path_tracer.V3
+module Bbox = Path_tracer.Bbox
 module Slice = Path_tracer.Slice
 
 let fst3 (x, _, _) = x
@@ -35,6 +36,7 @@ module Make (P : sig
   val x : t -> float
   val y : t -> float
   val z : t -> float
+  val bbox : t -> Bbox.t
 end) =
 struct
   let cmp_x = make_cmp P.x
@@ -47,45 +49,39 @@ struct
 
   type t =
     | Empty
-    | Leaf of P.t
+    | Leaf of
+        { elt : P.t
+        ; bbox : Bbox.t
+        }
     | Branch of
         { elt : P.t
+        ; elt_bbox : Bbox.t
+        ; subtree_bbox : Bbox.t
         ; lhs : t
         ; rhs : t
         }
 
   let point p = P3.create ~x:(P.x p) ~y:(P.y p) ~z:(P.z p)
 
-  let search t ~center ~radius2 ~f =
-    let rec loop t cmps =
+  let search t ~center ~f =
+    let rec loop t =
       match t with
       | Empty -> ()
-      | Leaf p ->
-        let v = V3.of_points ~src:(point p) ~tgt:center in
-        if Float.O.(V3.quadrance v <= radius2) then f p
-      | Branch { elt; lhs; rhs } ->
-        let v = V3.of_points ~src:(point elt) ~tgt:center in
-        let q = V3.quadrance v in
-        let in_range = Float.O.(q <= radius2) in
-        let cmp = fst3 cmps in
-        let cmps = rotate cmps in
-        if in_range
+      | Leaf { elt; bbox } -> if Bbox.mem bbox center then f elt
+      | Branch { elt; elt_bbox; subtree_bbox; lhs; rhs } ->
+        if Bbox.mem subtree_bbox center
         then (
-          f elt;
-          loop lhs cmps;
-          loop rhs cmps)
-        else (
-          (* prune branch that is further away *)
-          let c = cmp center elt in
-          loop (if c < 0 then lhs else rhs) cmps)
+          if Bbox.mem elt_bbox center then f elt;
+          loop lhs;
+          loop rhs)
     in
-    let cmp_x = make_cmp' P3.x P.x in
-    let cmp_y = make_cmp' P3.y P.y in
-    let cmp_z = make_cmp' P3.z P.z in
-    let cmp_xyz = lex cmp_x cmp_y cmp_z in
-    let cmp_yzx = lex cmp_y cmp_z cmp_x in
-    let cmp_zxy = lex cmp_z cmp_x cmp_y in
-    loop t (cmp_xyz, cmp_yzx, cmp_zxy)
+    loop t
+  ;;
+
+  let tree_bbox = function
+    | Empty -> failwith "tree_bbox: Empty"
+    | Leaf { bbox; _ } -> bbox
+    | Branch { subtree_bbox; _ } -> subtree_bbox
   ;;
 
   let create ps =
@@ -97,27 +93,65 @@ struct
     let ps_x = f ~compare:cmp_xyz
     and ps_y = f ~compare:cmp_yzx
     and ps_z = f ~compare:cmp_zxy in
-    let rec loop (ps, qs, rs) ((cmp_p, cmp_q, cmp_r) as cmps) =
+    let tmp_lo = Array.create ~len:(1 + (Array.length ps / 2)) ps.(0) in
+    let tmp_hi = Array.create ~len:(1 + (Array.length ps / 2)) ps.(0) in
+    let split s ~on_lhs =
+      let i = ref 0
+      and j = ref 0 in
+      Slice.iter s ~f:(fun elt ->
+          if on_lhs elt
+          then (
+            tmp_lo.(!i) <- elt;
+            Int.incr i)
+          else (
+            tmp_hi.(!j) <- elt;
+            Int.incr j));
+      let lhs, rhs = Slice.split_at s (Slice.length s / 2) in
+      assert (Slice.length lhs <= Slice.length rhs);
+      for i = 0 to Slice.length lhs - 1 do
+        Slice.set lhs i tmp_lo.(i)
+      done;
+      for i = 0 to Slice.length rhs - 1 do
+        Slice.set rhs i tmp_hi.(i)
+      done;
+      lhs, Slice.tail rhs
+    in
+    let mk_leaf elt = Leaf { elt; bbox = P.bbox elt } in
+    let rec loop (ps, qs, rs) ((prj, _, _) as prjs) =
       match Slice.length ps with
       | 0 -> failwith "BUG: Kd_tree.create: slice length = 0"
-      | 1 -> Leaf (Slice.get ps 0)
-      | 2 -> Branch { elt = Slice.get ps 1; lhs = Leaf (Slice.get ps 0); rhs = Empty }
+      | 1 -> mk_leaf @@ Slice.get ps 0
+      | 2 ->
+        let elt = Slice.get ps 1 in
+        let elt_bbox = P.bbox elt in
+        let lhs = mk_leaf @@ Slice.get ps 0 in
+        let subtree_bbox = Bbox.union elt_bbox (tree_bbox lhs) in
+        Branch { elt; elt_bbox; subtree_bbox; lhs; rhs = Empty }
       | 3 ->
-        Branch
-          { elt = Slice.get ps 1
-          ; lhs = Leaf (Slice.get ps 0)
-          ; rhs = Leaf (Slice.get ps 2)
-          }
-      | _ ->
-        let median = lower_median ps in
-        let ps_l, ps_r = partition ~median ps cmp_p in
-        let qs_l, qs_r = partition ~median qs cmp_q in
-        let rs_l, rs_r = partition ~median rs cmp_r in
-        let cmps = rotate cmps in
-        let lhs = loop (rotate (ps_l, qs_l, rs_l)) cmps in
-        let rhs = loop (rotate (ps_r, qs_r, rs_r)) cmps in
-        Branch { elt = median; lhs; rhs }
+        let elt = Slice.get ps 1 in
+        let elt_bbox = P.bbox elt in
+        let lhs = mk_leaf @@ Slice.get ps 0 in
+        let rhs = mk_leaf @@ Slice.get ps 2 in
+        let subtree_bbox =
+          Bbox.union elt_bbox (Bbox.union (tree_bbox lhs) (tree_bbox rhs))
+        in
+        Branch { elt; elt_bbox; subtree_bbox; lhs; rhs }
+      | _len ->
+        let ps_l, ps_r = Slice.split_at ps @@ ((Slice.length ps - 1) / 2) in
+        let median = Slice.get ps_r 0 in
+        let ps_r = Slice.tail ps_r in
+        let on_lhs elt = Float.( < ) (prj elt) (prj median) in
+        let qs_l, qs_r = split qs ~on_lhs in
+        let rs_l, rs_r = split rs ~on_lhs in
+        let prjs = rotate prjs in
+        let lhs = loop (rotate (ps_l, qs_l, rs_l)) prjs in
+        let rhs = loop (rotate (ps_r, qs_r, rs_r)) prjs in
+        let elt_bbox = P.bbox median in
+        let subtree_bbox =
+          Bbox.union elt_bbox (Bbox.union (tree_bbox lhs) (tree_bbox rhs))
+        in
+        Branch { elt = median; elt_bbox; subtree_bbox; lhs; rhs }
     in
-    loop (ps_x, ps_y, ps_z) comparators
+    loop (ps_x, ps_y, ps_z) (P.x, P.y, P.z)
   ;;
 end

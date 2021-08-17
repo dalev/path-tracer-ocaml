@@ -4,6 +4,7 @@ val create : 'a array -> 'a t
 val length : 'a t -> int
 val base_index : 'a t -> int -> int
 val get : 'a t -> int -> 'a
+val set : 'a t -> int -> 'a -> unit
 val fold : 'a t -> init:'b -> f:('b -> 'a -> 'b) -> 'b
 val iter : 'a t -> f:('a -> unit) -> unit
 val map_reduce : 'a t -> transform:('a -> 'b) -> combine:('b -> 'b -> 'b) -> 'b

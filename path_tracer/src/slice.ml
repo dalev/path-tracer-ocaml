@@ -9,8 +9,18 @@ type 'a t =
 let create base = { base; offset = 0; length = Array.length base }
 let length t = t.length
 let base_index t index = t.offset + index
-let get t index = t.base.(base_index t index)
 let unsafe_get t index = Array.unsafe_get t.base (base_index t index)
+
+let get t index =
+  assert (index >= 0 && index < t.length);
+  unsafe_get t index
+;;
+
+let set t index v =
+  assert (index >= 0 && index < t.length);
+  Array.unsafe_set t.base (base_index t index) v
+;;
+
 let to_array_map t ~f = Array.init t.length ~f:(fun i -> f (get t i))
 let to_array t = to_array_map t ~f:Fn.id
 

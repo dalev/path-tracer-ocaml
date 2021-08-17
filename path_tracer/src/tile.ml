@@ -42,7 +42,6 @@ let iter t ~f =
   let x0 = t.col in
   let y0 = t.row in
   for y = y0 to y0 + t.height - 1 do
-    let y = y0 + t.height - 1 - y in
     for x = x0 to x0 + t.width - 1 do
       f ~x ~y
     done
