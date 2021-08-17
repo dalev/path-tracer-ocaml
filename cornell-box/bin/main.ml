@@ -154,9 +154,7 @@ end = struct
   ;;
 end
 
-module Shape_tree :
-  Shape_tree.S with type elt := Shape.t and type elt_hit := Shape.Hit.t =
-Shape_tree.Make (Shape_tree.Array_leaf (struct
+module Shape_tree = Shape_tree.Make (Shape_tree.Array_leaf (struct
   include Shape
 
   type hit = Hit.t

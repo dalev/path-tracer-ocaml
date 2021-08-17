@@ -214,16 +214,18 @@ module Simd_leaf : Leaf_S = struct
   ;;
 end
 
-module type Spheres_S =
-  Shape_tree.S with type elt := Sphere.t and type elt_hit := float * Sphere.t
-
 let main { Args.common; no_simd } =
   let { Common_args.width; height; _ } = common in
   let leaf =
     if no_simd then (module Array_leaf : Leaf_S) else (module Simd_leaf : Leaf_S)
   in
   let module Leaf = (val leaf : Leaf_S) in
-  let module Spheres : Spheres_S = Shape_tree.Make (Leaf) in
+  let module Spheres :
+    Shape_tree_intf.Sig(Leaf).S
+      with type elt_hit := float * Sphere.t
+       and type elt := Sphere.t =
+    Shape_tree.Make (Leaf)
+  in
   let module Leaf_lengths = struct
     type s =
       { size : int

@@ -152,12 +152,14 @@ module Proposal = struct
   ;;
 end
 
-module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit = struct
+module Make (L : Leaf) = struct
+  type leaf = L.t
+
   module Tree = struct
     type t =
       | Leaf of
           { bbox : Bbox.t
-          ; leaf : L.t
+          ; leaf : leaf
           }
       | Branch of
           { axis : V3.t -> float
@@ -240,6 +242,19 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
       in
       loop t ~t_min ~t_max
     ;;
+
+    let iter_neighbors t point ~f =
+      let rec loop t =
+        match t with
+        | Leaf { bbox; leaf } -> if Bbox.mem bbox point then f leaf
+        | Branch { bbox; lhs; rhs; axis = _ } ->
+          if Bbox.mem bbox point
+          then (
+            loop lhs;
+            loop rhs)
+      in
+      loop t
+    ;;
   end
 
   type t = { root : Tree.t }
@@ -258,6 +273,7 @@ module Make (L : Leaf) : S with type elt := L.elt and type elt_hit := L.elt_hit 
   ;;
 
   let intersect t ray ~t_min ~t_max = Tree.intersect t.root ray ~t_min ~t_max
+  let iter_neighbors t point ~f = Tree.iter_neighbors t.root point ~f
 
   let chunks slice =
     let len = Slice.length slice / 8 in
@@ -300,7 +316,8 @@ module Array_leaf (Elt : sig
   val length : t -> int
   val depth : t -> int
   val intersect : t -> Ray.t -> t_min:float -> t_max:float -> hit option
-end) : Leaf with type elt = Elt.t and type elt_hit = Elt.hit = struct
+end) : Leaf with type t = Elt.t array and type elt = Elt.t and type elt_hit = Elt.hit =
+struct
   type elt = Elt.t
   type t = Elt.t array
   type elt_hit = Elt.hit

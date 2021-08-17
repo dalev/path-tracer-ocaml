@@ -81,6 +81,17 @@ struct
     a /. Float.of_int (width + height)
   ;;
 
+  let take_2d s =
+    let open L.Sample in
+    let samples_index = ref 0 in
+    fun () ->
+      let j = !samples_index in
+      let u = s.%{j}
+      and v = s.%{j + 1} in
+      samples_index := j + 2;
+      u, v
+  ;;
+
   let collect_hit_points tile sampler =
     let pts = ref [] in
     let record p = pts := p :: !pts in
@@ -88,16 +99,7 @@ struct
     Tile.iter tile ~f:(fun ~x ~y ->
         let sampler', s = L.step !sampler in
         sampler := sampler';
-        let take_2d =
-          let open L.Sample in
-          let samples_index = ref 2 in
-          fun () ->
-            let j = !samples_index in
-            let u = s.%{j}
-            and v = s.%{j + 1} in
-            samples_index := j + 2;
-            u, v
-        in
+        let take_2d = take_2d s in
         let rec loop ray beta max_bounces =
           if max_bounces > 0
           then
@@ -115,9 +117,7 @@ struct
                   let pixel = x, y in
                   record (Hit_point.create ~pixel ~shader_space ~beta))
         in
-        let open L.Sample in
-        let dx = s.%{0}
-        and dy = s.%{1} in
+        let dx, dy = take_2d () in
         let xf = inv_widthf *. (dx +. Float.of_int x)
         and yf = inv_heightf *. (dy +. Float.of_int y) in
         loop (Camera.ray camera xf yf) Color.white max_bounces);
@@ -128,24 +128,29 @@ struct
     Array.init (width * height) ~f:(fun _ -> Pixel_stat.create ~radius2:init_radius2)
   ;;
 
-  module Kd_tree = Kd_tree.Make (struct
-    include Hit_point
+  let pixel_stat x y = pixel_stats.((y * width) + x)
 
-    let x = Fn.compose P3.x point
-    let y = Fn.compose P3.y point
-    let z = Fn.compose P3.z point
+  module Hit_tree = Shape_tree.Make (Shape_tree.Array_leaf (struct
+    type t = Hit_point.t
+    type hit = unit
+
+    let hit_t () = -1.0
+    let depth _ = 0
+    let length _ = 1
+    let length_cutoff = 4
+    let intersect (_ : t) (_ : Ray.t) ~t_min:_ ~t_max:_ = None
 
     let bbox t =
-      let x, y = t.pixel in
-      let radius2 = Pixel_stat.radius2 pixel_stats.((y * width) + x) in
+      let x, y = Hit_point.pixel t in
+      let radius2 = Pixel_stat.radius2 (pixel_stat x y) in
       let radius = Float.sqrt radius2 in
-      let center = point t in
+      let center = Hit_point.point t in
       let offset = V3.create ~x:radius ~y:radius ~z:radius in
-      let max = P3.translate center offset
-      and min = P3.translate center V3.Infix.(~-offset) in
+      let min = P3.translate center V3.Infix.(~-offset)
+      and max = P3.translate center offset in
       Bbox.create ~min ~max
     ;;
-  end)
+  end))
 
   let trace_photon hit_points light ray sample =
     let sample_idx = ref 1 in
@@ -168,80 +173,71 @@ struct
           | Diffuse color ->
             let ss = Hit.shader_space h in
             let flux = Color.Infix.(flux * color) in
-            Kd_tree.search hit_points ~center:(Shader_space.world_origin ss) ~f:(fun hp ->
-                let hp_ss = Hit_point.shader_space hp in
-                let w =
-                  V3.of_points
-                    ~tgt:(Shader_space.world_origin hp_ss)
-                    ~src:(Shader_space.world_origin ss)
-                in
-                let pixel_stat =
-                  let x, y = Hit_point.pixel hp in
-                  let i = (y * width) + x in
-                  if i >= Array.length pixel_stats || i < 0
-                  then
-                    raise_s
-                      [%message
-                        "pixel_stats index out of bounds"
-                          ~idx:(i : int)
-                          ~length:(Array.length pixel_stats : int)]
-                  else pixel_stats.(i)
-                in
-                let radius2 = Pixel_stat.radius2 pixel_stat in
-                let dp =
-                  V3.dot (Shader_space.world_normal hp_ss) (Shader_space.world_normal ss)
-                in
-                let open Float.O in
-                if dp >= 1e-3 && V3.quadrance w <= radius2
-                then (
-                  let n = Float.of_int (Pixel_stat.n_over_alpha pixel_stat) * alpha in
-                  let g = (n + alpha) / (n + 1.0) in
-                  pixel_stat.Pixel_stat.tau
-                    <- Color.scale
-                         Color.Infix.(
-                           pixel_stat.Pixel_stat.tau + Color.scale flux (1.0 / Float.pi))
-                         g;
-                  pixel_stat.Pixel_stat.radius2 <- g * radius2;
-                  pixel_stat.Pixel_stat.n_over_alpha
-                    <- Int.O.(pixel_stat.Pixel_stat.n_over_alpha + 1)));
-            let dir = Shader_space.unit_square_to_hemisphere u v in
-            let ray = Shader_space.world_ray ss dir in
-            loop ray flux fuel))
+            Hit_tree.iter_neighbors
+              hit_points
+              (Shader_space.world_origin ss)
+              ~f:(fun hps ->
+                Array.iter hps ~f:(fun hp ->
+                    let hp_ss = Hit_point.shader_space hp in
+                    let w =
+                      V3.of_points
+                        ~tgt:(Shader_space.world_origin hp_ss)
+                        ~src:(Shader_space.world_origin ss)
+                    in
+                    let pixel_stat =
+                      let x, y = Hit_point.pixel hp in
+                      pixel_stat x y
+                    in
+                    let radius2 = Pixel_stat.radius2 pixel_stat in
+                    let dp =
+                      V3.dot
+                        (Shader_space.world_normal hp_ss)
+                        (Shader_space.world_normal ss)
+                    in
+                    let open Float.O in
+                    if dp >= 1e-5 && V3.quadrance w <= radius2
+                    then (
+                      let n = Float.of_int (Pixel_stat.n_over_alpha pixel_stat) * alpha in
+                      let g = (n + alpha) / (n + 1.0) in
+                      pixel_stat.Pixel_stat.tau
+                        <- Color.scale
+                             Color.Infix.(
+                               pixel_stat.Pixel_stat.tau
+                               + Color.scale flux (1.0 / Float.pi))
+                             g;
+                      pixel_stat.Pixel_stat.radius2 <- g * radius2;
+                      pixel_stat.Pixel_stat.n_over_alpha
+                        <- Int.O.(pixel_stat.Pixel_stat.n_over_alpha + 1)));
+                let dir = Shader_space.unit_square_to_hemisphere u v in
+                let ray = Shader_space.world_ray ss dir in
+                loop ray flux fuel)))
     in
     loop ray (Point_light.color light) max_bounces
   ;;
 
-  let go () =
-    ignore num_iterations;
-    printf "#tiles = %d\n" (List.length tiles);
-    let pool = Task.setup_pool ~num_additional_domains in
+  let gather_hit_points pool sampler tiles =
+    let cumulative_area = ref 0 in
     let tasks =
-      let s = ref (L.create ~dimension:(2 + (2 * (max_bounces + 1)))) in
       List.map tiles ~f:(fun tile ->
-          let n = Tile.area tile in
-          let sampler, suffix = L.split_at !s n in
-          s := suffix;
-          Task.async pool (fun () -> collect_hit_points tile sampler))
+          cumulative_area := !cumulative_area + Tile.area tile;
+          let prefix, _suffix = L.split_at sampler !cumulative_area in
+          Task.async pool (fun () -> collect_hit_points tile prefix))
     in
-    let hit_pts =
-      let pts = List.map tasks ~f:(Task.await pool) in
-      let len = List.sum (module Int) pts ~f:List.length in
-      let a = Array.create ~len (List.hd_exn (List.hd_exn pts)) in
-      let i = ref 0 in
-      List.iter pts ~f:(fun pts ->
-          List.iter pts ~f:(fun p ->
-              a.(!i) <- p;
-              Int.incr i));
-      Kd_tree.create a
-    in
-    let sampler = ref @@ L.create ~dimension:(2 + (2 * (max_bounces + 1))) in
+    let pts = List.concat_map tasks ~f:(Task.await pool) in
+    Hit_tree.create pts
+  ;;
+
+  let trace_photons pool sampler hit_points =
     let open L.Sample in
     List.iter point_lights ~f:(fun light ->
-        Task.parallel_for pool ~start:1 ~finish:num_photons ~body:(fun _ ->
-            let sampler', s = L.step !sampler in
-            sampler := sampler';
+        Task.parallel_for pool ~start:1 ~finish:num_photons ~body:(fun i ->
+            let pre, _ = L.split_at sampler i in
+            let s = snd @@ L.step pre in
             let ray = Point_light.random_ray light s.%{0} s.%{1} in
-            trace_photon hit_pts light ray s));
+            trace_photon hit_points light ray s))
+  ;;
+
+  let create_image pool =
     let img_data = Array.create ~len:(3 * Array.length pixel_stats) 0.0 in
     Task.parallel_for
       pool
@@ -259,11 +255,29 @@ struct
         Array.set img_data (base + 0) r;
         Array.set img_data (base + 1) g;
         Array.set img_data (base + 2) b);
-    Task.teardown_pool pool;
     Bimage.Image.of_data
       Bimage.Color.rgb
       width
       height
       (Bimage.Data.of_array Bimage.Type.f64 img_data)
+  ;;
+
+  let go () =
+    printf "#tiles = %d\n%!" (List.length tiles);
+    let pool = Task.setup_pool ~num_additional_domains in
+    let sampler = ref @@ L.create ~dimension:(2 + (2 * (max_bounces + 1))) in
+    for i = 1 to num_iterations do
+      printf "#iteration = %d\n%!" i;
+      let h_sampler, suffix = L.split_at !sampler (width * height) in
+      let p_sampler, suffix = L.split_at suffix num_photons in
+      sampler := suffix;
+      let hit_points = gather_hit_points pool h_sampler tiles in
+      trace_photons pool p_sampler hit_points
+    done;
+    let img = create_image pool in
+    Task.teardown_pool pool;
+    let n_sum = Array.sum (module Int) pixel_stats ~f:Pixel_stat.n_over_alpha in
+    printf "sum(n/alpha) = %d\n" n_sum;
+    img
   ;;
 end

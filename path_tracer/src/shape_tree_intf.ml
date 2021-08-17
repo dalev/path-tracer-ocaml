@@ -14,15 +14,18 @@ module type Leaf = sig
   val depth : t -> int
 end
 
-module type S = sig
-  type t
-  type elt
-  type elt_hit
+module Sig (L : Leaf) = struct
+  module type S = sig
+    type t
+    type elt
+    type elt_hit
 
-  val create : elt list -> t
-  val depth : t -> int
-  val length : t -> int
-  val intersect : t -> Ray.t -> t_min:float -> t_max:float -> elt_hit option
-  val leaf_length_histogram : t -> (int, int) Hashtbl.t
-  val bbox : t -> Bbox.t
+    val create : elt list -> t
+    val depth : t -> int
+    val length : t -> int
+    val intersect : t -> Ray.t -> t_min:float -> t_max:float -> elt_hit option
+    val leaf_length_histogram : t -> (int, int) Hashtbl.t
+    val bbox : t -> Bbox.t
+    val iter_neighbors : t -> P3.t -> f:(L.t -> unit) -> unit
+  end
 end
