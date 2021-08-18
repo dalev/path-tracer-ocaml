@@ -19,7 +19,7 @@ module Point_light = struct
   type t = { position : P3.t }
 
   let create ~position = { position }
-  let color (_ : t) = Color.(scale white (4.0 *. Float.pi *. 2000.0))
+  let color (_ : t) = Color.(scale white (4.0 *. Float.pi *. 1.0))
 
   let random_direction u v =
     let open Float.O in
