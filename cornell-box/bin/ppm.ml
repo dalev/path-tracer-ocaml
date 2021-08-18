@@ -255,13 +255,17 @@ struct
       and cy = inv_heightf *. (dy +. Float.of_int y) in
       loop (Camera.ray camera cx cy) Color.white max_bounces
     in
-    Task.parallel_for pool ~start:0 ~finish:(height - 1) ~body:(fun y ->
-        for x = 0 to width - 1 do
-          let _prefix, sampler = L.split_at sampler ((y * width) + x) in
-          let sample_vec = snd @@ L.step sampler in
-          let color = estimate_color ~x ~y sample_vec in
-          write_pixel ~x ~y color
-        done);
+    Task.parallel_for
+      pool
+      ~start:0
+      ~finish:((width * height) - 1)
+      ~body:(fun pixel ->
+        let x = pixel % width
+        and y = pixel / width in
+        let _prefix, sampler = L.split_at sampler pixel in
+        let sample_vec = snd @@ L.step sampler in
+        let color = estimate_color ~x ~y sample_vec in
+        write_pixel ~x ~y color);
     img
   ;;
 
