@@ -7,7 +7,7 @@ module Point_light = struct
   type t = { position : P3.t }
 
   let create ~position = { position }
-  let color (_ : t) = Color.(scale white (2500.0 *. 4.0 *. Float.pi))
+  let color (_ : t) = Color.(scale white 1.0)
 
   let random_direction u v =
     let open Float.O in
@@ -44,13 +44,22 @@ module Pixel_stat = struct
   type t =
     { mutable radius2 : float
     ; mutable tau : Color.t
-    ; mutable n_over_alpha : int
+    ; mutable n : float
+    ; mutex : Caml.Mutex.t
     }
 
-  let create ~radius2 = { radius2; tau = Color.black; n_over_alpha = 0 }
+  let create ~radius2 =
+    { radius2; tau = Color.black; n = 0.0; mutex = Caml.Mutex.create () }
+  ;;
+
+  let critical_section t ~f =
+    Caml.Mutex.lock t.mutex;
+    Exn.protect ~f ~finally:(fun () -> Caml.Mutex.unlock t.mutex)
+  ;;
+
   let radius2 t = t.radius2
   let tau t = t.tau
-  let n_over_alpha t = t.n_over_alpha
+  let n t = t.n
 end
 
 module Make (Scene : sig
@@ -124,11 +133,12 @@ struct
     !pts
   ;;
 
-  let pixel_stats =
-    Array.init (width * height) ~f:(fun _ -> Pixel_stat.create ~radius2:init_radius2)
+  let create_pixel_stats ~radius2 =
+    Array.init (width * height) ~f:(fun _ -> Pixel_stat.create ~radius2)
   ;;
 
-  let pixel_stat x y = pixel_stats.((y * width) + x)
+  let shared_pixel_stats = create_pixel_stats ~radius2:init_radius2
+  let shared_pixel_stat x y = shared_pixel_stats.((y * width) + x)
 
   module Hit_tree = Shape_tree.Make (Shape_tree.Array_leaf (struct
     type t = Hit_point.t
@@ -142,7 +152,7 @@ struct
 
     let bbox t =
       let x, y = Hit_point.pixel t in
-      let radius2 = Pixel_stat.radius2 (pixel_stat x y) in
+      let radius2 = Pixel_stat.radius2 (shared_pixel_stat x y) in
       let radius = Float.sqrt radius2 in
       let center = Hit_point.point t in
       let offset = V3.create ~x:radius ~y:radius ~z:radius in
@@ -152,24 +162,44 @@ struct
     ;;
   end))
 
-  let trace_photon hit_points light ray sample =
-    let sample_idx = ref 1 in
-    let u () =
-      Int.incr sample_idx;
-      L.Sample.get sample !sample_idx
+  let visit_neighbor hp photon_ss flux pixel_stats =
+    let hp_ss = Hit_point.shader_space hp in
+    let quadrance =
+      V3.quadrance
+      @@ V3.of_points
+           ~tgt:(Shader_space.world_origin hp_ss)
+           ~src:(Shader_space.world_origin photon_ss)
     in
-    let rec loop ray flux fuel =
-      if fuel > 0
+    let pixel_stat =
+      let x, y = Hit_point.pixel hp in
+      pixel_stats.((y * width) + x)
+    in
+    let radius2 = Pixel_stat.radius2 pixel_stat in
+    let dp =
+      V3.dot (Shader_space.world_normal hp_ss) (Shader_space.world_normal photon_ss)
+    in
+    let open Float.O in
+    if dp >= 1e-3 && quadrance <= radius2
+    then
+      Pixel_stat.critical_section pixel_stat ~f:(fun () ->
+          pixel_stat.Pixel_stat.tau
+            <- Color.Infix.(pixel_stat.Pixel_stat.tau + (flux * hp.Hit_point.beta));
+          pixel_stat.Pixel_stat.n <- pixel_stat.Pixel_stat.n + 1.0)
+  ;;
+
+  let trace_photon hit_points light sample max_bounces pixel_stats =
+    let take_2d = take_2d sample in
+    let rec loop ray flux max_bounces =
+      let max_bounces = max_bounces - 1 in
+      if max_bounces >= 0
       then (
-        let fuel = fuel - 1 in
         match intersect ray with
         | None -> ()
         | Some h ->
-          let u = u ()
-          and v = u () in
+          let u, v = take_2d () in
           (match Hit.scatter h u with
           | Absorb -> ()
-          | Specular (ray, color) -> loop ray Color.Infix.(flux * color) fuel
+          | Specular (ray, color) -> loop ray Color.Infix.(flux * color) max_bounces
           | Diffuse color ->
             let ss = Hit.shader_space h in
             let flux = Color.Infix.(flux * color) in
@@ -177,79 +207,79 @@ struct
               hit_points
               (Shader_space.world_origin ss)
               ~f:(fun hps ->
-                Array.iter hps ~f:(fun hp ->
-                    let hp_ss = Hit_point.shader_space hp in
-                    let w =
-                      V3.of_points
-                        ~tgt:(Shader_space.world_origin hp_ss)
-                        ~src:(Shader_space.world_origin ss)
-                    in
-                    let pixel_stat =
-                      let x, y = Hit_point.pixel hp in
-                      pixel_stat x y
-                    in
-                    let radius2 = Pixel_stat.radius2 pixel_stat in
-                    let dp =
-                      V3.dot
-                        (Shader_space.world_normal hp_ss)
-                        (Shader_space.world_normal ss)
-                    in
-                    let open Float.O in
-                    if dp >= 1e-5 && V3.quadrance w <= radius2
-                    then (
-                      let n = Float.of_int (Pixel_stat.n_over_alpha pixel_stat) * alpha in
-                      let g = (n + alpha) / (n + 1.0) in
-                      pixel_stat.Pixel_stat.tau
-                        <- Color.scale
-                             Color.Infix.(
-                               pixel_stat.Pixel_stat.tau
-                               + Color.scale flux (1.0 / Float.pi))
-                             g;
-                      pixel_stat.Pixel_stat.radius2 <- g * radius2;
-                      pixel_stat.Pixel_stat.n_over_alpha
-                        <- Int.O.(pixel_stat.Pixel_stat.n_over_alpha + 1)));
-                let dir = Shader_space.unit_square_to_hemisphere u v in
-                let ray = Shader_space.world_ray ss dir in
-                loop ray flux fuel)))
+                Array.iter hps ~f:(fun hp -> visit_neighbor hp ss flux pixel_stats));
+            let dir = Shader_space.unit_square_to_hemisphere u v in
+            let ray = Shader_space.world_ray ss dir in
+            loop ray flux max_bounces))
     in
+    let u, v = take_2d () in
+    let ray = Point_light.random_ray light u v in
     loop ray (Point_light.color light) max_bounces
   ;;
 
   let gather_hit_points pool sampler tiles =
-    let cumulative_area = ref 0 in
+    let sampler = ref sampler in
     let tasks =
       List.map tiles ~f:(fun tile ->
-          cumulative_area := !cumulative_area + Tile.area tile;
-          let prefix, _suffix = L.split_at sampler !cumulative_area in
+          let prefix, suffix = L.split_at !sampler (Tile.area tile) in
+          sampler := suffix;
           Task.async pool (fun () -> collect_hit_points tile prefix))
     in
     let pts = List.concat_map tasks ~f:(Task.await pool) in
-    Hit_tree.create pts
+    Hit_tree.create ~pool pts
   ;;
 
   let trace_photons pool sampler hit_points =
-    let open L.Sample in
+    let local_pixel_stats =
+      Array.map shared_pixel_stats ~f:(fun sh ->
+          let radius2 = sh.Pixel_stat.radius2 in
+          Pixel_stat.create ~radius2)
+    in
     List.iter point_lights ~f:(fun light ->
         Task.parallel_for pool ~start:1 ~finish:num_photons ~body:(fun i ->
             let pre, _ = L.split_at sampler i in
             let s = snd @@ L.step pre in
-            let ray = Point_light.random_ray light s.%{0} s.%{1} in
-            trace_photon hit_points light ray s))
-  ;;
-
-  let create_image pool =
-    let img_data = Array.create ~len:(3 * Array.length pixel_stats) 0.0 in
+            trace_photon hit_points light s max_bounces local_pixel_stats));
     Task.parallel_for
       pool
       ~start:0
-      ~finish:(Array.length pixel_stats - 1)
+      ~finish:(Array.length shared_pixel_stats - 1)
+      ~body:(fun i ->
+        let local = local_pixel_stats.(i)
+        and shared = shared_pixel_stats.(i) in
+        let m = local.Pixel_stat.n in
+        if Float.O.(m > 0.0)
+        then (
+          let n = shared.Pixel_stat.n in
+          let r2 = shared.Pixel_stat.radius2 in
+          let n' = n +. (alpha *. m) in
+          let r2' = r2 *. n' /. (n +. m) in
+          let tau' =
+            Color.scale
+              Color.Infix.(shared.Pixel_stat.tau + local.Pixel_stat.tau)
+              (r2' /. r2)
+          in
+          shared.Pixel_stat.n <- n';
+          shared.Pixel_stat.radius2 <- r2';
+          shared.Pixel_stat.tau <- tau'))
+  ;;
+
+  let create_image pool =
+    let img_data = Array.create ~len:(3 * Array.length shared_pixel_stats) 0.0 in
+    Task.parallel_for
+      pool
+      ~start:0
+      ~finish:(Array.length shared_pixel_stats - 1)
       ~body:(fun pix ->
-        let ps = pixel_stats.(pix) in
+        let ps = shared_pixel_stats.(pix) in
         let r, g, b =
           Color.to_rgb
           @@ Color.scale
                (Pixel_stat.tau ps)
-               (1.0 /. (Float.of_int num_photons *. Pixel_stat.radius2 ps))
+               (1.0
+               /. (Float.pi
+                  *. Float.of_int (num_iterations * num_photons)
+                  *. Pixel_stat.radius2 ps))
         in
         let base = 3 * pix in
         Array.set img_data (base + 0) r;
@@ -263,21 +293,25 @@ struct
   ;;
 
   let go () =
-    printf "#tiles = %d\n%!" (List.length tiles);
+    printf "#tiles = %d\n" (List.length tiles);
+    printf "#max-bounces = %d\n" max_bounces;
+    printf "#photons = %d\n" num_photons;
+    printf "#iterations = %d\n" num_iterations;
+    printf "-----\n%!";
     let pool = Task.setup_pool ~num_additional_domains in
-    let sampler = ref @@ L.create ~dimension:(2 + (2 * (max_bounces + 1))) in
-    for i = 1 to num_iterations do
+    let h_sampler = L.create ~dimension:(2 + (2 * (max_bounces + 1))) in
+    let p_sampler = L.create ~dimension:(2 + (2 * (max_bounces + 1))) in
+    for i = 0 to num_iterations - 1 do
       printf "#iteration = %d\n%!" i;
-      let h_sampler, suffix = L.split_at !sampler (width * height) in
-      let p_sampler, suffix = L.split_at suffix num_photons in
-      sampler := suffix;
+      let _prefix, h_sampler = L.split_at h_sampler (i * width * height) in
+      let _prefix, p_sampler = L.split_at p_sampler (i * num_photons) in
       let hit_points = gather_hit_points pool h_sampler tiles in
       trace_photons pool p_sampler hit_points
     done;
     let img = create_image pool in
     Task.teardown_pool pool;
-    let n_sum = Array.sum (module Int) pixel_stats ~f:Pixel_stat.n_over_alpha in
-    printf "sum(n/alpha) = %d\n" n_sum;
+    let n_sum = Array.sum (module Float) shared_pixel_stats ~f:Pixel_stat.n in
+    printf "sum(n/alpha) = %.3f\n" n_sum;
     img
   ;;
 end

@@ -13,7 +13,7 @@ let unsafe_get t index = Array.unsafe_get t.base (base_index t index)
 
 let get t index =
   assert (index >= 0 && index < t.length);
-  unsafe_get t index
+  Array.unsafe_get t.base (base_index t index)
 ;;
 
 let set t index v =

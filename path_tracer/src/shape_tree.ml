@@ -244,16 +244,15 @@ module Make (L : Leaf) = struct
     ;;
 
     let iter_neighbors t point ~f =
-      let rec loop t =
+      let rec loop t k =
         match t with
-        | Leaf { bbox; leaf } -> if Bbox.mem bbox point then f leaf
+        | Leaf { bbox; leaf } ->
+          if Bbox.mem bbox point then f leaf;
+          k ()
         | Branch { bbox; lhs; rhs; axis = _ } ->
-          if Bbox.mem bbox point
-          then (
-            loop lhs;
-            loop rhs)
+          if Bbox.mem bbox point then loop lhs (fun () -> loop rhs k) else k ()
       in
-      loop t
+      loop t Fn.id
     ;;
   end
 
