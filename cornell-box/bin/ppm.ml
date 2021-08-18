@@ -46,14 +46,13 @@ module Photon = struct
   type t =
     { omega_i : V3.t (* points towards origin of this photon in SS *)
     ; shader_space : Shader_space.t (* local geom of diffuse interaction *)
-    ; path_pr : float
     ; flux : Color.t
     ; radius : float
     }
 
-  let create shader_space ray ~path_pr flux ~radius =
+  let create shader_space ray flux ~radius =
     let omega_i = Shader_space.omega_i shader_space ray in
-    { omega_i; shader_space; path_pr; flux; radius }
+    { omega_i; shader_space; flux; radius }
   ;;
 
   let center t = Shader_space.world_origin t.shader_space
@@ -119,7 +118,7 @@ end = struct
     let open Float.O in
     let take_2d = take_2d sample in
     let photons = ref [] in
-    let rec loop ray path_pr flux max_bounces =
+    let rec loop ray flux max_bounces =
       if Int.O.(max_bounces > 0)
       then (
         let max_bounces = Int.O.(max_bounces - 1) in
@@ -129,12 +128,11 @@ end = struct
           let u, v = take_2d () in
           (match Hit.scatter h u with
           | Absorb -> ()
-          | Specular (ray, color) ->
-            loop ray path_pr Color.Infix.(flux * color) max_bounces
+          | Specular (ray, color) -> loop ray Color.Infix.(flux * color) max_bounces
           | Diffuse color ->
             let ss = Hit.shader_space h in
             let flux = Color.Infix.(flux * color) in
-            photons := Photon.create ss ray ~path_pr flux ~radius :: !photons;
+            photons := Photon.create ss ray flux ~radius :: !photons;
             let color_max = Color.max_coord color in
             if u < color_max
             then (
@@ -142,15 +140,11 @@ end = struct
               let u = u / color_max in
               let dir = Shader_space.unit_square_to_hemisphere u v in
               let ray = Shader_space.world_ray ss dir in
-              (* CR dalev: with RR, do we need to multiply path_pr by
-                 color_max? *)
-              let path_pr = color_max * path_pr * Pdf.(eval diffuse dir ss) in
-              loop ray path_pr flux max_bounces)))
+              loop ray flux max_bounces)))
     in
     let u, v = take_2d () in
     let ray = Point_light.random_ray light u v in
-    let path_pr = 1.0 / (4.0 * Float.pi) in
-    loop ray path_pr (Point_light.color light) max_bounces;
+    loop ray (Point_light.color light) max_bounces;
     !photons
   ;;
 
@@ -253,15 +247,8 @@ struct
                   let p_normal = Shader_space.world_normal p_ss in
                   if V3.dot p_normal hit_normal > 1e-3
                   then (
-                    (* let _pdf =
-                      let w_l = Shader_space.rotate_inv p_ss p.omega_i in
-                      let w_l' = Shader_space.rotate shader_space w_l in
-                      p.path_pr * Pdf.(eval diffuse w_l' shader_space)
-                    in
-                    let _pdf = p.path_pr in *)
-                    let pdf = 1.0 in
                     let area = Float.pi * Float.square p.radius in
-                    let scalar = 1.0 / (pdf * area) in
+                    let scalar = 1.0 / area in
                     Int.incr m;
                     l := Color.Infix.(!l + Color.scale p.flux scalar)));
               let open Color.Infix in

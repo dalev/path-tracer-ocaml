@@ -72,7 +72,7 @@ let spheres () =
   in
   let glass =
     let material = Material.glass in
-    let center = P3.create ~x:(0.1 + radius) ~y:radius ~z:(0.2 + radius) in
+    let center = P3.create ~x:(0.1 + radius) ~y:(0.1 + radius) ~z:(0.2 + radius) in
     Sphere.create ~material ~center ~radius
   in
   [ metal; glass ]
