@@ -1,5 +1,6 @@
 open! Base
 open Path_tracer
+module Ppm = Progressive_photon_map
 
 module Face = struct
   type t =

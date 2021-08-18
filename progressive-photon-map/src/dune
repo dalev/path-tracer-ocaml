@@ -1,0 +1,9 @@
+(library
+ (name progressive_photon_map)
+ (libraries
+  base
+  stdio
+  domainslib
+  bimage
+  low_discrepancy_sequence
+  path_tracer))

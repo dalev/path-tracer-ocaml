@@ -200,8 +200,6 @@ end) =
 struct
   open Scene
 
-  let max_area = 32 * 32
-
   let init_radius2 =
     let { P3.x; y; z } = P3.Infix.( - ) (Bbox.max bbox) (Bbox.min bbox) in
     let a = (x +. y +. z) /. 3.0 in
