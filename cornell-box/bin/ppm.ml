@@ -19,7 +19,7 @@ module Point_light = struct
   type t = { position : P3.t }
 
   let create ~position = { position }
-  let color (_ : t) = Color.(scale white (4.0 *. Float.pi *. 1.0))
+  let color (_ : t) = Color.(scale white (4.0 *. Float.pi *. 0.9))
 
   let random_direction u v =
     let open Float.O in
@@ -60,6 +60,7 @@ module Photon_map : sig
 
   (* call [f] on each photon whose radius includes the given point *)
   val iter_neighbors : t -> P3.t -> f:(Photon.t -> unit) -> unit
+  val length : t -> int
 
   val create
     :  Task.pool
@@ -96,6 +97,8 @@ end = struct
   end))
 
   type t = Tree.t
+
+  let length t = Tree.length t
 
   let iter_neighbors t point ~f =
     let open Float.O in
@@ -196,7 +199,7 @@ struct
   let init_radius2 =
     let { P3.x; y; z } = P3.Infix.( - ) (Bbox.max bbox) (Bbox.min bbox) in
     let a = (x +. y +. z) /. 3.0 in
-    2.0 *. a /. Float.of_int (width + height)
+    a /. Float.of_int (width + height)
   ;;
 
   let create_blank_image () = Bimage.Image.v Bimage.Type.f64 Bimage.Color.rgb width height
@@ -248,13 +251,15 @@ struct
                     in
                     let cos = V3.dot hit_normal w_l in
                     l := Color.Infix.(!l + Color.scale p.flux (Float.abs cos / pdf))));
-              Color.Infix.(beta * !l)))
+              let open Color.Infix in
+              beta * !l))
       in
       let dx, dy = take_2d () in
       let cx = inv_widthf *. (dx +. Float.of_int x)
       and cy = inv_heightf *. (dy +. Float.of_int y) in
       loop (Camera.ray camera cx cy) Color.white max_bounces
     in
+    let pmap_length = Photon_map.length pmap in
     Task.parallel_for
       pool
       ~start:0
@@ -264,7 +269,8 @@ struct
         and y = pixel / width in
         let _prefix, sampler = L.split_at sampler pixel in
         let sample_vec = snd @@ L.step sampler in
-        let color = estimate_color ~x ~y sample_vec in
+        let color' = estimate_color ~x ~y sample_vec in
+        let color = Color.scale color' (1.0 /. Float.of_int pmap_length) in
         write_pixel ~x ~y color);
     img
   ;;
