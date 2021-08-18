@@ -276,8 +276,11 @@ let main argv =
   let module Ppm = Ppm.Make (Scene) in
   let num_additional_domains = 7 in
   let pool = Domainslib.Task.setup_pool ~num_additional_domains in
+  let start = Time_now.nanoseconds_since_unix_epoch () in
   let img = Ppm.go pool in
+  let elapsed_ns = Int63.O.(Time_now.nanoseconds_since_unix_epoch () - start) in
   Domainslib.Task.teardown_pool pool;
+  Stdio.printf "render time = %.3f ms\n" (1e-6 *. Float.of_int63 elapsed_ns);
   match Bimage_io.write "output.png" img with
   | Ok () -> ()
   | Error (`File_not_found s) -> failwith @@ "file not found: " ^ s
