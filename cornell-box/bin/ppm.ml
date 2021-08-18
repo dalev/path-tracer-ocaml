@@ -21,7 +21,7 @@ module Point_light = struct
   let create ~position = { position }
 
   let color (_ : t) =
-    let p = 10.0 (* watts *) in
+    let p = 250.0 (* watts *) in
     Color.(scale white p)
   ;;
 
@@ -207,7 +207,7 @@ struct
   let init_radius2 =
     let { P3.x; y; z } = P3.Infix.( - ) (Bbox.max bbox) (Bbox.min bbox) in
     let a = (x +. y +. z) /. 3.0 in
-    0.5 *. a /. Float.of_int (width + height)
+    a /. Float.of_int (width + height)
   ;;
 
   let create_blank_image () = Bimage.Image.v Bimage.Type.f64 Bimage.Color.rgb width height
