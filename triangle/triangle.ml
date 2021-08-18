@@ -35,6 +35,7 @@ struct
       P3.scale a w + P3.scale b u + P3.scale c v
     ;;
 
+    let barycentric t = t.u, t.v
     let tex_coord t = Texture.Coord.create t.u t.v
     let face t = t.tri
   end

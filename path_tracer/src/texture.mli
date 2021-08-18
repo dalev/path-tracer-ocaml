@@ -1,7 +1,10 @@
 type t
 
 module Coord : sig
-  type t
+  type t = private
+    { u : float
+    ; v : float
+    }
 
   val create : float -> float -> t
 end

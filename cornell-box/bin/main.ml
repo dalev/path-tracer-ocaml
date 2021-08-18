@@ -5,6 +5,7 @@ module Face = struct
   type t =
     { material : Material.t
     ; vertices : P3.t * P3.t * P3.t
+    ; texs : Texture.Coord.t * Texture.Coord.t * Texture.Coord.t
     }
 
   let vertices t = t.vertices
@@ -13,7 +14,10 @@ end
 module Triangle = struct
   include Triangle.Make (Face)
 
-  let create ~material a b c = { Face.material; vertices = a, b, c }
+  let create ~material (a, ta) (b, tb) (c, tc) =
+    { Face.material; vertices = a, b, c; texs = ta, tb, tc }
+  ;;
+
   let material t = t.Face.material
 
   let transform t ~f =
@@ -35,11 +39,16 @@ let triangle_fan ~material pts =
   loop (List.tl_exn pts) []
 ;;
 
+let t00 = Texture.Coord.create 0.0 0.0
+let t01 = Texture.Coord.create 0.0 1.0
+let t10 = Texture.Coord.create 1.0 0.0
+let t11 = Texture.Coord.create 1.0 1.0
+
 let quad ~material a u v =
   let b = P3.translate a v in
   let c = P3.translate b u in
   let d = P3.translate a u in
-  triangle_fan ~material [ a; b; c; d ]
+  triangle_fan ~material [ a, t00; b, t10; c, t11; d, t01 ]
 ;;
 
 let solid_tex r g b = Texture.solid (Color.create ~r ~g ~b)
@@ -121,14 +130,23 @@ end = struct
       | T tri_hit ->
         let open Float.O in
         let module H = Triangle.Hit in
+        let tri = H.face tri_hit in
         let g_normal = H.g_normal tri_hit in
         let pt = H.point tri_hit in
-        let tex_coord = H.tex_coord tri_hit in
+        let tex_coord =
+          let module C = Texture.Coord in
+          let ta, tb, tc = tri.texs in
+          let u, v = H.barycentric tri_hit in
+          let w = 1.0 - u - v in
+          let tu = (ta.u * w) + (tb.u * u) + (tc.u * v)
+          and tv = (ta.v * w) + (tb.v * u) + (tc.v * v) in
+          C.create tu tv
+        in
         let hit_front = V3.dot (Ray.direction ray) g_normal < 0.0 in
         let normal = if hit_front then g_normal else V3.Infix.( ~- ) g_normal in
         let ss = Shader_space.create normal pt in
         let wi = Shader_space.omega_i ss ray in
-        let material = Triangle.material @@ H.face tri_hit in
+        let material = Triangle.material tri in
         let do_scatter = Material.scatter material ss tex_coord ~omega_i:wi ~hit_front in
         { Hit.shader_space = ss; emit = Color.black; do_scatter }
     ;;

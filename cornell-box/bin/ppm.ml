@@ -48,6 +48,10 @@ module Photon = struct
     ; shader_space : Shader_space.t (* local geom of diffuse interaction *)
     ; flux : Color.t
     ; radius : float
+          (* CR dalev: it's a little unfortunate that we store the 
+    radius with each photon -- it'll be the same for all photons in each
+    Photon_map.  But to satisfy the Shape_tree functor signature, we need to be
+    able to compute the bbox from [Photon.t]. *)
     }
 
   let create shader_space ray flux ~radius =
@@ -242,21 +246,25 @@ struct
               let open Float.O in
               let l = ref Color.black in
               let m = ref 0 in
+              let radius = ref 0.0 in
               Photon_map.iter_neighbors pmap hit_point ~f:(fun p ->
                   let p_ss = p.Photon.shader_space in
                   let p_normal = Shader_space.world_normal p_ss in
                   if V3.dot p_normal hit_normal > 1e-3
                   then (
-                    let area = Float.pi * Float.square p.radius in
-                    let scalar = 1.0 / area in
+                    radius := p.radius;
                     Int.incr m;
-                    l := Color.Infix.(!l + Color.scale p.flux scalar)));
-              let open Color.Infix in
+                    l := Color.Infix.(!l + p.flux)));
               if Int.( = ) !m 0
               then Color.black
               else (
-                let m = Float.of_int !m in
-                Color.scale (beta * !l) (1.0 / m))))
+                let area = Float.pi * Float.square !radius in
+                (* CR dalev the [1/m] factor corresponds to a box filter -- 
+                   every photon in the neighborhood of [hit_point] contributes
+                   equally.  Consider using a nicer kernel (e.g., cone or Gaussian) *)
+                let scalar = area * Float.of_int !m in
+                let open Color.Infix in
+                Color.scale (beta * !l) (1.0 / scalar))))
       in
       let dx, dy = take_2d () in
       let cx = inv_widthf *. (dx +. Float.of_int x)

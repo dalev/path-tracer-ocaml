@@ -15,6 +15,7 @@ end) : sig
     val g_normal : t -> V3.t
     val point : t -> P3.t
     val tex_coord : t -> Texture.Coord.t
+    val barycentric : t -> float * float
     val face : t -> Face.t
   end
 
