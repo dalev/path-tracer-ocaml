@@ -8,7 +8,6 @@
   base
   stdio
   path_tracer
-  render_command
   sphere
   triangle
   ;; CR dalev: factor these out later:

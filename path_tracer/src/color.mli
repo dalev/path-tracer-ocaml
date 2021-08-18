@@ -12,6 +12,7 @@ val white : t
 val scale : t -> float -> t
 val map : t -> f:(float -> float) -> t
 val lerp : float -> t -> t -> t
+val max_coord : t -> float
 
 module Infix : sig
   val ( + ) : t -> t -> t

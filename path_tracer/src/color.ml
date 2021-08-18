@@ -9,5 +9,6 @@ let white = create ~r:1.0 ~g:1.0 ~b:1.0
 let map = V3.map
 let scale = V3.scale
 let lerp = V3.lerp
+let max_coord = V3.max_coord
 
 module Infix = V3.Infix

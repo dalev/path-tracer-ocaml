@@ -154,6 +154,57 @@ end = struct
   ;;
 end
 
+module Args = struct
+  type t =
+    { width : int
+    ; height : int
+    ; iterations : int
+    ; max_bounces : int
+    ; photon_count : int
+    ; alpha : float
+    ; output : string
+    }
+
+  let parse ?(specs = []) () =
+    let width = ref 600 in
+    let height = ref !width in
+    let iterations = ref 1 in
+    let photon_count = ref 10_000 in
+    let file = ref "output.png" in
+    let alpha = ref (2 // 3) in
+    let no_progress = ref false in
+    let max_bounces = ref 4 in
+    let usage_msg =
+      Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width !height !file
+    in
+    let specs =
+      specs
+      @ Caml.Arg.
+          [ "-width", Set_int width, "<integer> image width"
+          ; "-height", Set_int height, "<integer> image height"
+          ; "-iterations", Set_int iterations, "<integer> # photon-map iterations"
+          ; "-photon-count", Set_int photon_count, "<integer> #photons per iteration"
+          ; "-alpha", Set_float alpha, "<float-in-(0,1)> photon-map alpha"
+          ; "-o", Set_string file, "<file> output file"
+          ; "-no-progress", Set no_progress, "suppress progress monitor"
+          ; "-max-bounces", Set_int max_bounces, "<integer> max ray bounces"
+          ]
+    in
+    Caml.Arg.parse
+      specs
+      (fun (_ : string) -> failwith "No anonymous arguments expected")
+      usage_msg;
+    { width = !width
+    ; height = !height
+    ; iterations = !iterations
+    ; max_bounces = !max_bounces
+    ; photon_count = !photon_count
+    ; alpha = !alpha
+    ; output = !file
+    }
+  ;;
+end
+
 module Shape_tree = Shape_tree.Make (Shape_tree.Array_leaf (struct
   include Shape
 
@@ -166,7 +217,7 @@ module Shape_tree = Shape_tree.Make (Shape_tree.Array_leaf (struct
 end))
 
 let main argv =
-  let { Render_command.Args.width; height; _ } = argv in
+  let { Args.width; height; _ } = argv in
   let camera =
     let aspect = width // height in
     let eye = P3.create ~x:0.5 ~y:0.5 ~z:(-1.0) in
@@ -186,8 +237,10 @@ let main argv =
     let width = width
     let height = height
     let camera = camera
-    let num_iterations = argv.Render_command.Args.samples_per_pixel
-    let max_bounces = argv.Render_command.Args.max_bounces
+    let num_iterations = argv.Args.iterations
+    let max_bounces = argv.Args.max_bounces
+    let photon_count = argv.Args.photon_count
+    let alpha = argv.Args.alpha
     let bbox = Shape_tree.bbox tree
 
     let point_lights =
@@ -203,11 +256,14 @@ let main argv =
   end
   in
   let module Ppm = Ppm.Make (Scene) in
-  let img = Ppm.go () in
+  let num_additional_domains = 7 in
+  let pool = Domainslib.Task.setup_pool ~num_additional_domains in
+  let img = Ppm.go pool in
+  Domainslib.Task.teardown_pool pool;
   match Bimage_io.write "output.png" img with
   | Ok () -> ()
   | Error (`File_not_found s) -> failwith @@ "file not found: " ^ s
   | Error (#Bimage.Error.t as e) -> Bimage.Error.exc e
 ;;
 
-let () = main @@ Render_command.Args.parse ()
+let () = main @@ Args.parse ()
