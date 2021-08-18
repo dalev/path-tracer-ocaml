@@ -19,7 +19,11 @@ module Point_light = struct
   type t = { position : P3.t }
 
   let create ~position = { position }
-  let color (_ : t) = Color.(scale white (4.0 *. Float.pi *. 0.9))
+
+  let color (_ : t) =
+    let p = 10.0 (* watts *) in
+    Color.(scale white p)
+  ;;
 
   let random_direction u v =
     let open Float.O in
@@ -96,13 +100,16 @@ end = struct
     ;;
   end))
 
-  type t = Tree.t
+  type t =
+    { tree : Tree.t
+    ; length : int
+    }
 
-  let length t = Tree.length t
+  let length t = t.length
 
   let iter_neighbors t point ~f =
     let open Float.O in
-    Tree.iter_neighbors t point ~f:(fun a ->
+    Tree.iter_neighbors t.tree point ~f:(fun a ->
         Array.iter a ~f:(fun p ->
             let v = V3.of_points ~src:(Photon.center p) ~tgt:point in
             if V3.quadrance v < Float.square p.radius then f p))
@@ -137,7 +144,7 @@ end = struct
               let ray = Shader_space.world_ray ss dir in
               (* CR dalev: with RR, do we need to multiply path_pr by
                  color_max? *)
-              let path_pr = path_pr * Pdf.(eval diffuse dir ss) in
+              let path_pr = color_max * path_pr * Pdf.(eval diffuse dir ss) in
               loop ray path_pr flux max_bounces)))
     in
     let u, v = take_2d () in
@@ -175,7 +182,8 @@ end = struct
             Chan.send c @@ Some (trace_photon light s max_bounces scene_intersect ~radius)));
     Chan.send c None;
     let photons = Caml.Domain.join collector in
-    Tree.create ~pool photons
+    let length = List.length photons in
+    { tree = Tree.create ~pool photons; length }
   ;;
 end
 
@@ -199,7 +207,7 @@ struct
   let init_radius2 =
     let { P3.x; y; z } = P3.Infix.( - ) (Bbox.max bbox) (Bbox.min bbox) in
     let a = (x +. y +. z) /. 3.0 in
-    a /. Float.of_int (width + height)
+    0.5 *. a /. Float.of_int (width + height)
   ;;
 
   let create_blank_image () = Bimage.Image.v Bimage.Type.f64 Bimage.Color.rgb width height
@@ -239,20 +247,29 @@ struct
               let hit_normal = Shader_space.world_normal shader_space in
               let open Float.O in
               let l = ref Color.black in
+              let m = ref 0 in
               Photon_map.iter_neighbors pmap hit_point ~f:(fun p ->
                   let p_ss = p.Photon.shader_space in
                   let p_normal = Shader_space.world_normal p_ss in
                   if V3.dot p_normal hit_normal > 1e-3
                   then (
-                    let w_l = Shader_space.rotate_inv p_ss p.omega_i in
-                    let pdf =
+                    (* let _pdf =
+                      let w_l = Shader_space.rotate_inv p_ss p.omega_i in
                       let w_l' = Shader_space.rotate shader_space w_l in
                       p.path_pr * Pdf.(eval diffuse w_l' shader_space)
                     in
-                    let cos = V3.dot hit_normal w_l in
-                    l := Color.Infix.(!l + Color.scale p.flux (Float.abs cos / pdf))));
+                    let _pdf = p.path_pr in *)
+                    let pdf = 1.0 in
+                    let area = Float.pi * Float.square p.radius in
+                    let scalar = 1.0 / (pdf * area) in
+                    Int.incr m;
+                    l := Color.Infix.(!l + Color.scale p.flux scalar)));
               let open Color.Infix in
-              beta * !l))
+              if Int.( = ) !m 0
+              then Color.black
+              else (
+                let m = Float.of_int !m in
+                Color.scale (beta * !l) (1.0 / m))))
       in
       let dx, dy = take_2d () in
       let cx = inv_widthf *. (dx +. Float.of_int x)
@@ -310,6 +327,7 @@ struct
           ~radius
           ~point_lights
       in
+      printf "  photon map length = %d\n%!" (Photon_map.length pmap);
       let _prefix, eye_sampler = L.split_at p_sampler photon_count in
       let img = render_image pool eye_sampler pmap in
       ignore
