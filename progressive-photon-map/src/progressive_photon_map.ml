@@ -328,6 +328,7 @@ struct
           : (float, Bigarray.float64_elt, [ `Rgb ]) Bimage.Image.t)
     done;
     let n = Float.of_int num_iterations in
-    Bimage.Image.map_inplace (fun x -> x /. n) img_sum
+    let gamma = Float.sqrt in
+    Bimage.Image.map_inplace (fun x -> gamma @@ (x /. n)) img_sum
   ;;
 end
