@@ -271,6 +271,7 @@ struct
     in
     let pmap_length = Photon_map.length pmap in
     Task.parallel_for
+      ~chunk_size:(32 * 32)
       pool
       ~start:0
       ~finish:((width * height) - 1)
