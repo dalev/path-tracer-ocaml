@@ -204,15 +204,17 @@ struct
 
   let create_blank_image () = Bimage.Image.v Bimage.Type.f64 Bimage.Color.rgb width height
 
-  let render_image pool sampler pmap =
+  let render_image img pool sampler pmap =
     let module Image = Bimage.Image in
-    let img = create_blank_image () in
+    let module Pixel = Bimage.Pixel in
     let write_pixel ~x ~y color =
       let y = height - 1 - y in
+      let p = Image.get_pixel img x y in
       let r, g, b = Color.to_rgb color in
-      Image.set img x y 0 r;
-      Image.set img x y 1 g;
-      Image.set img x y 2 b
+      Pixel.set p 0 (r +. Pixel.get p 0);
+      Pixel.set p 1 (g +. Pixel.get p 1);
+      Pixel.set p 2 (b +. Pixel.get p 2);
+      Image.set_pixel img x y p
     in
     let inv_widthf = 1 // width in
     let inv_heightf = 1 // height in
@@ -287,8 +289,7 @@ struct
         let sampler ~dimension = sampler ~offset:pixel ~dimension in
         let color' = estimate_color ~x ~y sampler in
         let color = Color.scale color' (1.0 /. Float.of_int pmap_length) in
-        write_pixel ~x ~y color);
-    img
+        write_pixel ~x ~y color)
   ;;
 
   let radius2 i =
@@ -341,10 +342,7 @@ struct
       in
       printf "  photon map length = %d\n%!" (Photon_map.length pmap);
       let eye_sample_base = i * width * height in
-      let img = render_image pool (offset_sampler e_sampler eye_sample_base) pmap in
-      ignore
-        (Bimage.Image.map2_inplace ( +. ) img_sum img
-          : (float, Bigarray.float64_elt, [ `Rgb ]) Bimage.Image.t)
+      render_image img_sum pool (offset_sampler e_sampler eye_sample_base) pmap
     done;
     let n = Float.of_int num_iterations in
     let gamma = Float.sqrt in
