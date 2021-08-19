@@ -217,26 +217,20 @@ struct
     let inv_widthf = 1 // width in
     let inv_heightf = 1 // height in
     let estimate_color ~x ~y sampler =
-      let take_2d d' =
-        let u = sampler ~dimension:d'
-        and v = sampler ~dimension:(d' + 1) in
-        u, v
-      in
-      let rec loop ray beta max_bounces dim =
+      let rec loop ray beta max_bounces dimension =
         if max_bounces <= 0
         then Color.black
         else (
-          let dim = dim + 2 in
           match intersect ray with
           | None -> Color.black
           | Some h ->
             let max_bounces = max_bounces - 1 in
-            let u, _v = take_2d dim in
+            let u = sampler ~dimension in
             (match Hit.scatter h u with
             | Absorb -> Color.black
             | Specular (ray, color) ->
               let beta = Color.Infix.(color * beta) in
-              loop ray beta max_bounces dim
+              loop ray beta max_bounces (dimension + 1)
             | Diffuse color ->
               let beta = Color.Infix.(color * beta) in
               let shader_space = Hit.shader_space h in
@@ -275,10 +269,11 @@ struct
                 let open Color.Infix in
                 Color.scale (beta * flux) (1.0 / (area *. total_weight)))))
       in
-      let dx, dy = take_2d 0 in
+      let dx = sampler ~dimension:0
+      and dy = sampler ~dimension:1 in
       let cx = inv_widthf *. (dx +. Float.of_int x)
       and cy = inv_heightf *. (dy +. Float.of_int y) in
-      loop (Camera.ray camera cx cy) Color.white max_bounces 0
+      loop (Camera.ray camera cx cy) Color.white max_bounces 2
     in
     let pmap_length = Photon_map.length pmap in
     Task.parallel_for
@@ -317,16 +312,27 @@ struct
     printf "#photons/iter = %d\n" photon_count;
     printf "#iterations = %d\n" num_iterations;
     printf "-----\n%!";
-    let sampler = L.create ~dimensions:(2 + (2 * (max_bounces + 1))) in
+    let p_sampler = L.create ~dimensions:(2 + (2 * (max_bounces + 1))) in
+    let e_sampler =
+      (* CR dalev:
+      this is extremely conservative: eye paths terminate at the first diffuse
+      interaction, so will rarely achieve max_bounces.  Using only a small
+      prefix of the high-dimensional sampler introduces visible artifacts
+      compared to just using a lower-dimensional sampler.  However, then you
+      run the risk of having to prematurely terminate a path with many specular
+      bounces.  Maybe a different low-discrepancy seq would perform better for
+      eye paths -- e.g., Halton?
+      *)
+      L.create ~dimensions:(2 + (max_bounces + 1))
+    in
     let img_sum = create_blank_image () in
     for i = 0 to num_iterations - 1 do
       let radius = radius (i + 1) in
       printf "#iteration = %d, radius = %.3f\n%!" i radius;
-      let p_sample_base = i * (photon_count + (width * height)) in
       let pmap =
         Photon_map.create
           pool
-          (offset_sampler sampler p_sample_base)
+          (offset_sampler p_sampler (i * photon_count))
           ~scene_intersect:Scene.intersect
           ~photon_count
           ~max_bounces
@@ -334,8 +340,8 @@ struct
           ~point_lights
       in
       printf "  photon map length = %d\n%!" (Photon_map.length pmap);
-      let eye_sample_base = p_sample_base + photon_count in
-      let img = render_image pool (offset_sampler sampler eye_sample_base) pmap in
+      let eye_sample_base = i * width * height in
+      let img = render_image pool (offset_sampler e_sampler eye_sample_base) pmap in
       ignore
         (Bimage.Image.map2_inplace ( +. ) img_sum img
           : (float, Bigarray.float64_elt, [ `Rgb ]) Bimage.Image.t)
