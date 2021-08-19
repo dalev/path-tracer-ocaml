@@ -3,7 +3,11 @@ open Base
 module Point_light : sig
   type t
 
-  val create : position:Path_tracer.Affine.p3 -> t
+  val create
+    :  position:Path_tracer.Affine.p3
+    -> power:float
+    -> color:Path_tracer.Color.t
+    -> t
 end
 
 module Make (Scene : sig

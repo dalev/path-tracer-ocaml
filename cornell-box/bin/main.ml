@@ -244,17 +244,37 @@ let main argv =
     let up = V3.unit_y in
     Camera.create ~eye ~target ~up ~aspect ~vertical_fov_deg:45.0
   in
-  let light_center = P3.create ~x:0.5 ~y:0.93 ~z:0.5 in
+  let light_center = P3.create ~x:0.5 ~y:0.82 ~z:0.5 in
+  let _light_enclosure =
+    let radius = 0.05 in
+    (* slightly off center from the light to create a visual effect *)
+    let center = P3.create ~x:0.5 ~y:0.85 ~z:0.5 in
+    [ Shape.of_sphere @@ Sphere.create ~material:Material.glass ~center ~radius ]
+  in
+  let light_enclosure' =
+    let quad p u v =
+      let u = V3.scale u 2.0
+      and v = V3.scale v 2.0 in
+      quad ~material:(Material.metal (solid_tex 0.30 0.999 0.30)) p u v
+    in
+    let r = 0.05 in
+    let rx = V3.(scale unit_x r) in
+    let ry = V3.(scale unit_y 0.04) in
+    let rz = V3.(scale unit_z r) in
+    let open V3.Infix in
+    let lc = P3.to_v3 light_center in
+    let a = P3.of_v3 @@ (lc - rx - ry - rz) in
+    let b = P3.of_v3 @@ (lc + rx - ry + rz) in
+    let r = quad a rz ry in
+    let f = quad a ry rx in
+    let l = quad b ~-rz ry in
+    let b = quad b rx ry in
+    List.map ~f:Shape.of_triangle @@ List.concat_no_order [ r; f; l; b ]
+  in
   let tree =
     let f = Camera.transform camera in
-    let light_enclosure =
-      let radius = 0.05 in
-      (* slightly off center from the light to create a visual effect *)
-      let center = P3.create ~x:0.5 ~y:0.90 ~z:0.5 in
-      [ Shape.of_sphere @@ Sphere.create ~material:Material.glass ~center ~radius ]
-    in
     let shapes =
-      light_enclosure
+      light_enclosure'
       @ List.map (empty_box ()) ~f:Shape.of_triangle
       @ List.map (spheres ()) ~f:Shape.of_sphere
     in
@@ -272,7 +292,7 @@ let main argv =
 
     let point_lights =
       let position = Camera.transform camera light_center in
-      [ Ppm.Point_light.create ~position ]
+      [ Ppm.Point_light.create ~position ~power:350.0 ~color:Color.white ]
     ;;
 
     let intersect ray =

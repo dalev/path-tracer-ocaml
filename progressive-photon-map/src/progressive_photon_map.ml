@@ -13,14 +13,17 @@ let normal_pdf ~mean ~stddev x =
 ;;
 
 module Point_light = struct
-  type t = { position : P3.t }
+  type t =
+    { position : P3.t
+    ; color : Color.t
+    }
 
-  let create ~position = { position }
-
-  let color (_ : t) =
-    let p = 250.0 (* watts *) in
-    Color.(scale white p)
+  let create ~position ~power ~color =
+    let color = Color.scale color power in
+    { position; color }
   ;;
+
+  let color t = t.color
 
   let random_direction u v =
     let open Float.O in
