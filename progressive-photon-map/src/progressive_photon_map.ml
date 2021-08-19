@@ -50,8 +50,7 @@ end
 
 module Photon = struct
   type t =
-    { omega_i : V3.t (* points towards origin of this photon in SS *)
-    ; shader_space : Shader_space.t (* local geom of diffuse interaction *)
+    { shader_space : Shader_space.t (* local geom of diffuse interaction *)
     ; flux : Color.t
     ; radius : float
           (* CR dalev: it's a little unfortunate that we store the 
@@ -60,11 +59,7 @@ module Photon = struct
     able to compute the bbox from [Photon.t]. *)
     }
 
-  let create shader_space ray flux ~radius =
-    let omega_i = Shader_space.omega_i shader_space ray in
-    { omega_i; shader_space; flux; radius }
-  ;;
-
+  let create shader_space ray flux ~radius = { shader_space; flux; radius }
   let center t = Shader_space.world_origin t.shader_space
 end
 
