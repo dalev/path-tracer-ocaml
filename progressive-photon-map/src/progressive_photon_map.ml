@@ -210,7 +210,7 @@ struct
   let init_radius2 =
     let { P3.x; y; z } = P3.Infix.( - ) (Bbox.max bbox) (Bbox.min bbox) in
     let a = (x +. y +. z) /. 3.0 in
-    let b = (width + height) // 3 in
+    let b = (width + height) // 1 in
     Float.square @@ (a /. b)
   ;;
 
@@ -251,6 +251,14 @@ struct
               let hit_point = Shader_space.world_origin shader_space in
               let hit_normal = Shader_space.world_normal shader_space in
               let open Float.O in
+              let distance p =
+                let tgt = Photon.center p in
+                Float.sqrt @@ V3.quadrance (V3.of_points ~src:hit_point ~tgt)
+              in
+              let weight p =
+                let stddev = p.Photon.radius / 3.0 in
+                normal_pdf ~mean:0.0 ~stddev (distance p)
+              in
               let neighbors =
                 Photon_map.fold_neighbors pmap hit_point ~init:[] ~f:(fun neighbors p ->
                     let p_ss = p.Photon.shader_space in
@@ -264,25 +272,18 @@ struct
               | hd :: _ as neighbors ->
                 let radius = hd.Photon.radius in
                 let radius2 = Float.square radius in
-                let distance p =
-                  let tgt = Photon.center p in
-                  Float.sqrt @@ V3.quadrance (V3.of_points ~src:hit_point ~tgt)
-                in
-                let weight p =
-                  let stddev = radius / 3.0 in
-                  normal_pdf ~mean:0.0 ~stddev (distance p)
-                in
                 let area = Float.pi * radius2 in
-                let total_weight = List.sum (module Float) neighbors ~f:weight in
-                let flux =
-                  List.sum
-                    (module Color)
+                let flux, total_weight =
+                  List.fold
                     neighbors
-                    ~f:(fun p ->
+                    ~init:(Color.black, 0.0)
+                    ~f:(fun (sum_flux, sum_weight) p ->
+                      let w = weight p in
                       (* CR dalev: do we need to divide by pdf of eye ray bouncing towards the incoming photon? *)
                       (* let pdf = V3.dot hit_normal p.Photon.wi / Float.pi in *)
                       let pdf = 1.0 in
-                      Color.scale p.Photon.flux (weight p / pdf))
+                      let flux = Color.scale p.Photon.flux (w / pdf) in
+                      Color.Infix.(sum_flux + flux), sum_weight + w)
                 in
                 let open Color.Infix in
                 Color.scale (beta * flux) (1.0 / (area *. total_weight)))))
