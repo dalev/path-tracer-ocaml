@@ -210,7 +210,7 @@ struct
   let init_radius2 =
     let { P3.x; y; z } = P3.Infix.( - ) (Bbox.max bbox) (Bbox.min bbox) in
     let a = (x +. y +. z) /. 3.0 in
-    let b = (width + height) // 2 in
+    let b = (width + height) // 3 in
     Float.square @@ (a /. b)
   ;;
 
