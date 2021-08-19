@@ -257,7 +257,7 @@ struct
                 let radius = hd.Photon.radius in
                 let radius2 = Float.square radius in
                 let distance p =
-                  let tgt = Shader_space.world_origin p.Photon.shader_space in
+                  let tgt = Photon.center p in
                   Float.sqrt @@ V3.quadrance (V3.of_points ~src:hit_point ~tgt)
                 in
                 let weight p =
