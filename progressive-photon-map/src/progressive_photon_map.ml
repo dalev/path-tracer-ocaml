@@ -177,6 +177,7 @@ end = struct
     Chan.send c None;
     let photons = Caml.Domain.join collector in
     let length = List.length photons in
+    if length = 0 then failwith "BUG: no photons";
     { tree = Tree.create ~pool photons; length }
   ;;
 end

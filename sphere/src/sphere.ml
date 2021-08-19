@@ -43,7 +43,12 @@ let intersect { center; radius; _ } ray ~t_min ~t_max =
   if discrim < 0.0
   then None
   else (
-    let sign_b' = Sign.to_float (Float.sign_exn b') in
+    let sign_b' =
+      (* [Sign.to_float] is not correct here: if the ray origin is precisely the circle center, then b' = 0 *)
+      match Float.sign_exn b' with
+      | Sign.Zero | Sign.Pos -> 1.0
+      | Sign.Neg -> -1.0
+    in
     let q = Caml.Float.fma sign_b' (Float.sqrt (a * discrim)) b' in
     let c = V3.quadrance f - r2 in
     let t_hit = if c > 0.0 then c / q else q / a in
