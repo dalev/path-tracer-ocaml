@@ -338,6 +338,7 @@ struct
       L.create ~dimensions:(2 + (max_bounces + 1))
     in
     let img_sum = create_blank_image () in
+    let img_avg = create_blank_image () in
     for i = 0 to num_iterations - 1 do
       let radius = radius (i + 1) in
       printf "#iteration = %d, radius = %.3f\n%!" i radius;
@@ -354,11 +355,18 @@ struct
       printf "  photon map length = %d\n%!" (Photon_map.length pmap);
       let eye_sample_base = i * width * height in
       render_image img_sum pool (offset_sampler e_sampler eye_sample_base) pmap;
-      let img_avg =
-        let n = 1 // (i + 1) in
-        let gamma = Float.sqrt in
-        Bimage.Image.map (fun x -> gamma @@ (x *. n)) img_sum
-      in
+      let n = 1 // (i + 1) in
+      Task.parallel_for
+        pool
+        ~start:0
+        ~finish:((width * height) - 1)
+        ~body:(fun i ->
+          let x = i % width
+          and y = i / width in
+          for c = 0 to 2 do
+            let f = Bimage.Image.get img_sum x y c in
+            Bimage.Image.set img_avg x y c (Float.sqrt (f *. n))
+          done);
       save_image img_avg file_name
     done
   ;;
