@@ -187,8 +187,8 @@ module Args = struct
   let parse ?(specs = []) () =
     let width = ref 600 in
     let height = ref !width in
-    let iterations = ref 1 in
-    let photon_count = ref 10_000 in
+    let iterations = ref 10 in
+    let photon_count = ref 150_000 in
     let file = ref "output.png" in
     let alpha = ref (2 // 3) in
     let no_progress = ref false in
