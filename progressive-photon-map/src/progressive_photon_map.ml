@@ -15,6 +15,12 @@ let take_2d s =
     u, v
 ;;
 
+let normal_pdf ~mean ~stddev x =
+  let open Float.O in
+  Float.exp (-0.5 * Float.square ((x - mean) / stddev))
+  / (stddev * Float.sqrt (2.0 * Float.pi))
+;;
+
 module Point_light = struct
   type t = { position : P3.t }
 
@@ -66,7 +72,7 @@ module Photon_map : sig
   type t
 
   (* call [f] on each photon whose radius includes the given point *)
-  val iter_neighbors : t -> P3.t -> f:(Photon.t -> unit) -> unit
+  val fold_neighbors : t -> P3.t -> init:'a -> f:('a -> Photon.t -> 'a) -> 'a
   val length : t -> int
 
   val create
@@ -110,12 +116,12 @@ end = struct
 
   let length t = t.length
 
-  let iter_neighbors t point ~f =
+  let fold_neighbors t point ~init ~f =
     let open Float.O in
-    Tree.iter_neighbors t.tree point ~f:(fun a ->
-        Array.iter a ~f:(fun p ->
+    Tree.fold_neighbors t.tree point ~init ~f:(fun acc a ->
+        Array.fold a ~init:acc ~f:(fun acc p ->
             let v = V3.of_points ~src:(Photon.center p) ~tgt:point in
-            if V3.quadrance v < Float.square p.radius then f p))
+            if V3.quadrance v < Float.square p.radius then f acc p else acc))
   ;;
 
   let trace_photon light sample max_bounces intersect ~radius =
@@ -242,27 +248,37 @@ struct
               let hit_point = Shader_space.world_origin shader_space in
               let hit_normal = Shader_space.world_normal shader_space in
               let open Float.O in
-              let l = ref Color.black in
-              let m = ref 0 in
-              let radius = ref 0.0 in
-              Photon_map.iter_neighbors pmap hit_point ~f:(fun p ->
-                  let p_ss = p.Photon.shader_space in
-                  let p_normal = Shader_space.world_normal p_ss in
-                  if V3.dot p_normal hit_normal > 1e-3
-                  then (
-                    radius := p.radius;
-                    Int.incr m;
-                    l := Color.Infix.(!l + p.flux)));
-              if Int.( = ) !m 0
-              then Color.black
-              else (
-                let area = Float.pi * Float.square !radius in
-                (* CR dalev the [1/m] factor corresponds to a box filter -- 
-                   every photon in the neighborhood of [hit_point] contributes
-                   equally.  Consider using a nicer kernel (e.g., cone or Gaussian) *)
-                let scalar = area * Float.of_int !m in
+              let neighbors =
+                Photon_map.fold_neighbors pmap hit_point ~init:[] ~f:(fun neighbors p ->
+                    let p_ss = p.Photon.shader_space in
+                    let p_normal = Shader_space.world_normal p_ss in
+                    if V3.dot p_normal hit_normal > 1e-3
+                    then p :: neighbors
+                    else neighbors)
+              in
+              (match neighbors with
+              | [] -> Color.black
+              | hd :: _ as neighbors ->
+                let radius = hd.Photon.radius in
+                let radius2 = Float.square radius in
+                let distance p =
+                  let tgt = Shader_space.world_origin p.Photon.shader_space in
+                  Float.sqrt @@ V3.quadrance (V3.of_points ~src:hit_point ~tgt)
+                in
+                let weight p =
+                  let stddev = radius / 3.0 in
+                  normal_pdf ~mean:0.0 ~stddev (distance p)
+                in
+                let area = Float.pi * radius2 in
+                let total_weight = List.sum (module Float) neighbors ~f:weight in
+                let flux =
+                  List.sum
+                    (module Color)
+                    neighbors
+                    ~f:(fun p -> Color.scale p.Photon.flux (weight p))
+                in
                 let open Color.Infix in
-                Color.scale (beta * !l) (1.0 / scalar))))
+                Color.scale (beta * flux) (1.0 / (area *. total_weight)))))
       in
       let dx, dy = take_2d () in
       let cx = inv_widthf *. (dx +. Float.of_int x)

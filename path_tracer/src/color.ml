@@ -12,3 +12,6 @@ let lerp = V3.lerp
 let max_coord = V3.max_coord
 
 module Infix = V3.Infix
+include Infix
+
+let zero = black

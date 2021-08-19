@@ -243,16 +243,14 @@ module Make (L : Leaf) = struct
       loop t ~t_min ~t_max
     ;;
 
-    let iter_neighbors t point ~f =
-      let rec loop t k =
+    let fold_neighbors t point ~init ~f =
+      let rec loop t acc k =
         match t with
-        | Leaf { bbox; leaf } ->
-          if Bbox.mem bbox point then f leaf;
-          k ()
+        | Leaf { bbox; leaf } -> k @@ if Bbox.mem bbox point then f acc leaf else acc
         | Branch { bbox; lhs; rhs; axis = _ } ->
-          if Bbox.mem bbox point then loop lhs (fun () -> loop rhs k) else k ()
+          if Bbox.mem bbox point then loop lhs acc (fun acc -> loop rhs acc k) else k acc
       in
-      loop t Fn.id
+      loop t init Fn.id
     ;;
   end
 
@@ -272,7 +270,7 @@ module Make (L : Leaf) = struct
   ;;
 
   let intersect t ray ~t_min ~t_max = Tree.intersect t.root ray ~t_min ~t_max
-  let iter_neighbors t point ~f = Tree.iter_neighbors t.root point ~f
+  let fold_neighbors t point ~init ~f = Tree.fold_neighbors t.root point ~init ~f
 
   let chunks slice =
     let len = Slice.length slice / 8 in

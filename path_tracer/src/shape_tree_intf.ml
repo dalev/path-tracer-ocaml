@@ -26,6 +26,6 @@ module Sig (L : Leaf) = struct
     val intersect : t -> Ray.t -> t_min:float -> t_max:float -> elt_hit option
     val leaf_length_histogram : t -> (int, int) Hashtbl.t
     val bbox : t -> Bbox.t
-    val iter_neighbors : t -> P3.t -> f:(L.t -> unit) -> unit
+    val fold_neighbors : t -> P3.t -> init:'a -> f:('a -> L.t -> 'a) -> 'a
   end
 end
