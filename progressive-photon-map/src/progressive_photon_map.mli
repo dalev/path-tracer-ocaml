@@ -22,5 +22,5 @@ module Make (Scene : sig
   val photon_count : int
   val alpha : float
 end) : sig
-  val go : Domainslib.Task.pool -> (float, Bigarray.float64_elt, [ `Rgb ]) Bimage.Image.t
+  val go : Domainslib.Task.pool -> string -> unit
 end

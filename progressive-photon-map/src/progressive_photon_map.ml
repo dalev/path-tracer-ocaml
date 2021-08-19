@@ -312,7 +312,14 @@ struct
     L.get s ~offset:(offset + base) ~dimension
   ;;
 
-  let go pool =
+  let save_image img file_name =
+    match Bimage_io.write file_name img with
+    | Ok () -> ()
+    | Error (`File_not_found s) -> failwith @@ "file not found: " ^ s
+    | Error (#Bimage.Error.t as e) -> Bimage.Error.exc e
+  ;;
+
+  let go pool file_name =
     printf "#max-bounces = %d\n" max_bounces;
     printf "#photons/iter = %d\n" photon_count;
     printf "#iterations = %d\n" num_iterations;
@@ -346,10 +353,13 @@ struct
       in
       printf "  photon map length = %d\n%!" (Photon_map.length pmap);
       let eye_sample_base = i * width * height in
-      render_image img_sum pool (offset_sampler e_sampler eye_sample_base) pmap
-    done;
-    let n = Float.of_int num_iterations in
-    let gamma = Float.sqrt in
-    Bimage.Image.map_inplace (fun x -> gamma @@ (x /. n)) img_sum
+      render_image img_sum pool (offset_sampler e_sampler eye_sample_base) pmap;
+      let img_avg =
+        let n = 1 // (i + 1) in
+        let gamma = Float.sqrt in
+        Bimage.Image.map (fun x -> gamma @@ (x *. n)) img_sum
+      in
+      save_image img_avg file_name
+    done
   ;;
 end
