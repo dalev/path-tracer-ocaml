@@ -1,19 +1,10 @@
 open Base
 open Path_tracer
 open Stdio
-module L = Low_discrepancy_sequence
+module L = Low_discrepancy_sequence.Simple
 module Task = Domainslib.Task
 
-let take_2d s =
-  let open L.Sample in
-  let samples_index = ref 0 in
-  fun () ->
-    let j = !samples_index in
-    let u = s.%{j}
-    and v = s.%{j + 1} in
-    samples_index := j + 2;
-    u, v
-;;
+type sampler = offset:int -> dimension:int -> float
 
 let normal_pdf ~mean ~stddev x =
   let open Float.O in
@@ -59,7 +50,7 @@ module Photon = struct
     able to compute the bbox from [Photon.t]. *)
     }
 
-  let create shader_space ray flux ~radius = { shader_space; flux; radius }
+  let create shader_space (_ : Ray.t) flux ~radius = { shader_space; flux; radius }
   let center t = Shader_space.world_origin t.shader_space
 end
 
@@ -72,7 +63,7 @@ module Photon_map : sig
 
   val create
     :  Task.pool
-    -> Low_discrepancy_sequence.t
+    -> sampler
     -> scene_intersect:(Ray.t -> Hit.t option)
     -> radius:float
     -> photon_count:int
@@ -119,37 +110,42 @@ end = struct
             if V3.quadrance v < Float.square p.radius then f acc p else acc))
   ;;
 
-  let trace_photon light sample max_bounces intersect ~radius =
-    let open Float.O in
-    let take_2d = take_2d sample in
+  let trace_photon light sampler max_bounces intersect ~radius =
     let photons = ref [] in
-    let rec loop ray flux max_bounces =
-      if Int.O.(max_bounces > 0)
+    let take_2d d' =
+      let u = sampler ~dimension:d'
+      and v = sampler ~dimension:(d' + 1) in
+      u, v
+    in
+    let rec loop ray flux max_bounces dim =
+      if max_bounces > 0
       then (
-        let max_bounces = Int.O.(max_bounces - 1) in
+        let dim = dim + 2 in
+        let u, v = take_2d dim in
+        let max_bounces = max_bounces - 1 in
         match intersect ray with
         | None -> ()
         | Some h ->
-          let u, v = take_2d () in
           (match Hit.scatter h u with
           | Absorb -> ()
-          | Specular (ray, color) -> loop ray Color.Infix.(flux * color) max_bounces
+          | Specular (ray, color) -> loop ray Color.Infix.(flux * color) max_bounces dim
           | Diffuse color ->
             let ss = Hit.shader_space h in
             let flux = Color.Infix.(flux * color) in
             photons := Photon.create ss ray flux ~radius :: !photons;
             let color_max = Color.max_coord color in
+            let open Float.O in
             if u < color_max
             then (
               let flux = Color.scale flux (1.0 / color_max) in
               let u = u / color_max in
               let dir = Shader_space.unit_square_to_hemisphere u v in
               let ray = Shader_space.world_ray ss dir in
-              loop ray flux max_bounces)))
+              loop ray flux max_bounces dim)))
     in
-    let u, v = take_2d () in
+    let u, v = take_2d 0 in
     let ray = Point_light.random_ray light u v in
-    loop ray (Point_light.color light) max_bounces;
+    loop ray (Point_light.color light) max_bounces 0;
     !photons
   ;;
 
@@ -176,8 +172,7 @@ end = struct
     (* CR dalev: reuses sampler for different lights, fix me *)
     List.iter point_lights ~f:(fun light ->
         Task.parallel_for pool ~start:0 ~finish:(photon_count - 1) ~body:(fun i ->
-            let _, suffix = L.split_at sampler i in
-            let s = snd @@ L.step suffix in
+            let s ~dimension = sampler ~offset:i ~dimension in
             Chan.send c @@ Some (trace_photon light s max_bounces scene_intersect ~radius)));
     Chan.send c None;
     let photons = Caml.Domain.join collector in
@@ -221,22 +216,27 @@ struct
     in
     let inv_widthf = 1 // width in
     let inv_heightf = 1 // height in
-    let estimate_color ~x ~y sample_vec =
-      let take_2d = take_2d sample_vec in
-      let rec loop ray beta max_bounces =
+    let estimate_color ~x ~y sampler =
+      let take_2d d' =
+        let u = sampler ~dimension:d'
+        and v = sampler ~dimension:(d' + 1) in
+        u, v
+      in
+      let rec loop ray beta max_bounces dim =
         if max_bounces <= 0
         then Color.black
         else (
+          let dim = dim + 2 in
           match intersect ray with
           | None -> Color.black
           | Some h ->
             let max_bounces = max_bounces - 1 in
-            let u, _v = take_2d () in
+            let u, _v = take_2d dim in
             (match Hit.scatter h u with
             | Absorb -> Color.black
             | Specular (ray, color) ->
               let beta = Color.Infix.(color * beta) in
-              loop ray beta max_bounces
+              loop ray beta max_bounces dim
             | Diffuse color ->
               let beta = Color.Infix.(color * beta) in
               let shader_space = Hit.shader_space h in
@@ -275,10 +275,10 @@ struct
                 let open Color.Infix in
                 Color.scale (beta * flux) (1.0 / (area *. total_weight)))))
       in
-      let dx, dy = take_2d () in
+      let dx, dy = take_2d 0 in
       let cx = inv_widthf *. (dx +. Float.of_int x)
       and cy = inv_heightf *. (dy +. Float.of_int y) in
-      loop (Camera.ray camera cx cy) Color.white max_bounces
+      loop (Camera.ray camera cx cy) Color.white max_bounces 0
     in
     let pmap_length = Photon_map.length pmap in
     Task.parallel_for
@@ -289,9 +289,8 @@ struct
       ~body:(fun pixel ->
         let x = pixel % width
         and y = pixel / width in
-        let _prefix, sampler = L.split_at sampler pixel in
-        let sample_vec = snd @@ L.step sampler in
-        let color' = estimate_color ~x ~y sample_vec in
+        let sampler ~dimension = sampler ~offset:pixel ~dimension in
+        let color' = estimate_color ~x ~y sampler in
         let color = Color.scale color' (1.0 /. Float.of_int pmap_length) in
         write_pixel ~x ~y color);
     img
@@ -309,23 +308,25 @@ struct
 
   let radius i = Float.sqrt @@ radius2 i
 
+  let offset_sampler s base ~offset ~dimension =
+    L.get s ~offset:(offset + base) ~dimension
+  ;;
+
   let go pool =
     printf "#max-bounces = %d\n" max_bounces;
     printf "#photons/iter = %d\n" photon_count;
     printf "#iterations = %d\n" num_iterations;
     printf "-----\n%!";
-    let sampler = L.create ~dimension:(2 + (2 * (max_bounces + 1))) in
+    let sampler = L.create ~dimensions:(2 + (2 * (max_bounces + 1))) in
     let img_sum = create_blank_image () in
     for i = 0 to num_iterations - 1 do
       let radius = radius (i + 1) in
       printf "#iteration = %d, radius = %.3f\n%!" i radius;
-      let _prefix, p_sampler =
-        L.split_at sampler (i * (photon_count + (width * height)))
-      in
+      let p_sample_base = i * (photon_count + (width * height)) in
       let pmap =
         Photon_map.create
           pool
-          p_sampler
+          (offset_sampler sampler p_sample_base)
           ~scene_intersect:Scene.intersect
           ~photon_count
           ~max_bounces
@@ -333,8 +334,8 @@ struct
           ~point_lights
       in
       printf "  photon map length = %d\n%!" (Photon_map.length pmap);
-      let _prefix, eye_sampler = L.split_at p_sampler photon_count in
-      let img = render_image pool eye_sampler pmap in
+      let eye_sample_base = p_sample_base + photon_count in
+      let img = render_image pool (offset_sampler sampler eye_sample_base) pmap in
       ignore
         (Bimage.Image.map2_inplace ( +. ) img_sum img
           : (float, Bigarray.float64_elt, [ `Rgb ]) Bimage.Image.t)

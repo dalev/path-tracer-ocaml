@@ -24,3 +24,10 @@ val step : t -> t * Sample.t
 (** [split_at t n] produces [lhs, rhs] where [lhs] contains the first [n] 
   sample vectors in [t], and [rhs] contains the remainder. *)
 val split_at : t -> int -> t * t
+
+module Simple : sig
+  type t
+
+  val create : dimensions:int -> t
+  val get : t -> offset:int -> dimension:int -> float
+end

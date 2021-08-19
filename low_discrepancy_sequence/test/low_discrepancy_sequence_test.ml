@@ -1,4 +1,4 @@
-module L = Low_discrepancy_sequence
+module L = Low_discrepancy_sequence.Simple
 
 (* s is in [0, 1); map it into [lower, upper) *)
 let scale_sample s ~lower ~upper = ((upper -. lower) *. s) +. lower
@@ -6,16 +6,12 @@ let scale_sample s ~lower ~upper = ((upper -. lower) *. s) +. lower
 (* Use quasi-monte-carlo to estimate integral of f(x) dx, for x in [lower, upper) *)
 let integrate_1d f lower upper ~iterations =
   assert (lower < upper);
-  let l = ref (L.create ~dimension:1) in
-  let sample () =
-    let l', s = L.step !l in
-    l := l';
-    scale_sample ~lower ~upper @@ L.Sample.(s.%{0})
-  in
+  let l = L.create ~dimensions:1 in
+  let sample offset = scale_sample ~lower ~upper @@ L.get l ~offset ~dimension:0 in
   let sum = ref 0.0
   and c = ref 0.0 in
-  for _ = 0 to iterations - 1 do
-    let y = (f @@ sample ()) -. !c in
+  for i = 0 to iterations - 1 do
+    let y = (f @@ sample i) -. !c in
     let t = !sum +. y in
     c := t -. !sum -. y;
     sum := t

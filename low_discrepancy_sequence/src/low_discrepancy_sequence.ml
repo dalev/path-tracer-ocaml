@@ -29,11 +29,15 @@ let fractional x = x -. Float.trunc x
 let clamp x = fractional (0.5 +. x)
 let clamp_add a b = clamp @@ (a +. b)
 
+let alpha dimension =
+  let phi = phi_approx dimension in
+  FArray.init dimension (fun i -> recip (phi ** Float.of_int (i + 1)))
+;;
+
 let create ~dimension =
   if dimension < 1
   then failwith "Low_discrepancy_sequence.create: expected dimension >= 1";
-  let phi = phi_approx dimension in
-  let alpha = FArray.init dimension (fun i -> recip (phi ** Float.of_int (i + 1))) in
+  let alpha = alpha dimension in
   let current = FArray.copy alpha in
   { current; alpha }
 ;;
@@ -53,3 +57,18 @@ let step t =
   let t' = { t with current = next } in
   t', sample
 ;;
+
+module Simple = struct
+  type t = { alpha : floatarray } [@@unboxed]
+
+  let create ~dimensions =
+    if dimensions < 1
+    then failwith "Low_discrepancy_sequence.create: expected dimension >= 1";
+    { alpha = alpha dimensions }
+  ;;
+
+  let get t ~offset ~dimension =
+    let a = FArray.get t.alpha dimension in
+    clamp @@ (a *. float_of_int (1 + offset))
+  ;;
+end
