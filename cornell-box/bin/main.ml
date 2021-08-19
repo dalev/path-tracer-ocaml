@@ -249,13 +249,14 @@ let main argv =
     let f = Camera.transform camera in
     let light_enclosure =
       let radius = 0.05 in
+      (* slightly off center from the light to create a visual effect *)
       let center = P3.create ~x:0.5 ~y:0.90 ~z:0.5 in
-      [ Sphere.create ~material:Material.glass ~center ~radius ]
+      [ Shape.of_sphere @@ Sphere.create ~material:Material.glass ~center ~radius ]
     in
-    (* let light_enclosure = [] in *)
     let shapes =
-      List.map (empty_box ()) ~f:Shape.of_triangle
-      @ List.map (light_enclosure @ spheres ()) ~f:Shape.of_sphere
+      light_enclosure
+      @ List.map (empty_box ()) ~f:Shape.of_triangle
+      @ List.map (spheres ()) ~f:Shape.of_sphere
     in
     Shape_tree.create @@ List.map shapes ~f:(fun t -> Shape.transform t ~f)
   in
