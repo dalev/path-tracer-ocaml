@@ -45,6 +45,7 @@ end
 module Photon = struct
   type t =
     { shader_space : Shader_space.t (* local geom of diffuse interaction *)
+    ; wi : V3.t
     ; flux : Color.t
     ; radius : float
           (* CR dalev: it's a little unfortunate that we store the 
@@ -53,7 +54,11 @@ module Photon = struct
     able to compute the bbox from [Photon.t]. *)
     }
 
-  let create shader_space (_ : Ray.t) flux ~radius = { shader_space; flux; radius }
+  let create shader_space ray flux ~radius =
+    let wi = V3.normalize @@ V3.Infix.( ~- ) (Ray.direction ray) in
+    { wi; shader_space; flux; radius }
+  ;;
+
   let center t = Shader_space.world_origin t.shader_space
 end
 
@@ -123,9 +128,9 @@ end = struct
     let rec loop ray flux max_bounces dim =
       if max_bounces > 0
       then (
-        let dim = dim + 2 in
-        let u, v = take_2d dim in
         let max_bounces = max_bounces - 1 in
+        let u, v = take_2d dim in
+        let dim = dim + 2 in
         match intersect ray with
         | None -> ()
         | Some h ->
@@ -138,17 +143,19 @@ end = struct
             photons := Photon.create ss ray flux ~radius :: !photons;
             let color_max = Color.max_coord color in
             let open Float.O in
-            if u < color_max
+            if u <= color_max
             then (
-              let flux = Color.scale flux (1.0 / color_max) in
-              let u = u / color_max in
+              let cm_inv = 1.0 / color_max in
+              let flux = Color.scale flux cm_inv in
+              let u = u * cm_inv in
               let dir = Shader_space.unit_square_to_hemisphere u v in
               let ray = Shader_space.world_ray ss dir in
               loop ray flux max_bounces dim)))
     in
     let u, v = take_2d 0 in
     let ray = Point_light.random_ray light u v in
-    loop ray (Point_light.color light) max_bounces 0;
+    let dimension = 2 in
+    loop ray (Point_light.color light) max_bounces dimension;
     !photons
   ;;
 
@@ -203,7 +210,8 @@ struct
   let init_radius2 =
     let { P3.x; y; z } = P3.Infix.( - ) (Bbox.max bbox) (Bbox.min bbox) in
     let a = (x +. y +. z) /. 3.0 in
-    a /. Float.of_int (width + height)
+    let b = (width + height) // 2 in
+    Float.square @@ (a /. b)
   ;;
 
   let create_blank_image () = Bimage.Image.v Bimage.Type.f64 Bimage.Color.rgb width height
@@ -270,7 +278,11 @@ struct
                   List.sum
                     (module Color)
                     neighbors
-                    ~f:(fun p -> Color.scale p.Photon.flux (weight p))
+                    ~f:(fun p ->
+                      (* CR dalev: do we need to divide by pdf of eye ray bouncing towards the incoming photon? *)
+                      (* let pdf = V3.dot hit_normal p.Photon.wi / Float.pi in *)
+                      let pdf = 1.0 in
+                      Color.scale p.Photon.flux (weight p / pdf))
                 in
                 let open Color.Infix in
                 Color.scale (beta * flux) (1.0 / (area *. total_weight)))))
@@ -279,7 +291,8 @@ struct
       and dy = sampler ~dimension:1 in
       let cx = inv_widthf *. (dx +. Float.of_int x)
       and cy = inv_heightf *. (dy +. Float.of_int y) in
-      loop (Camera.ray camera cx cy) Color.white max_bounces 2
+      let dimension = 2 in
+      loop (Camera.ray camera cx cy) Color.white max_bounces dimension
     in
     let pmap_length = Photon_map.length pmap in
     Task.parallel_for

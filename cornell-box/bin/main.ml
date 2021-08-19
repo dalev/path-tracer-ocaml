@@ -85,7 +85,13 @@ let spheres () =
     let center = P3.create ~x:(0.1 + radius) ~y:(0.1 + radius) ~z:(0.2 + radius) in
     Sphere.create ~material ~center ~radius
   in
-  [ metal; glass ]
+  let behind_camera =
+    let material = Material.lambertian (solid_tex 0.75 0.75 0.75) in
+    let radius = 10.0 in
+    let center = P3.create ~x:0.5 ~y:0.5 ~z:(-2.0 -. radius) in
+    Sphere.create ~material ~center ~radius
+  in
+  [ metal; glass; behind_camera ]
 ;;
 
 module Shape : sig
@@ -292,7 +298,7 @@ let main argv =
 
     let point_lights =
       let position = Camera.transform camera light_center in
-      [ Ppm.Point_light.create ~position ~power:350.0 ~color:Color.white ]
+      [ Ppm.Point_light.create ~position ~power:400.0 ~color:Color.white ]
     ;;
 
     let intersect ray =
