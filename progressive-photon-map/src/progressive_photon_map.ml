@@ -370,17 +370,15 @@ struct
       let eye_sample_base = i * width * height in
       render_image img_sum pool (offset_sampler e_sampler eye_sample_base) pmap;
       let n = 1 // (i + 1) in
+      let sum_data = img_sum.Bimage.Image.data in
+      let avg_data = img_avg.Bimage.Image.data in
       Task.parallel_for
         pool
         ~start:0
-        ~finish:((width * height) - 1)
+        ~finish:((3 * width * height) - 1)
         ~body:(fun i ->
-          let x = i % width
-          and y = i / width in
-          for c = 0 to 2 do
-            let f = Bimage.Image.get img_sum x y c in
-            Bimage.Image.set img_avg x y c (Float.sqrt (f *. n))
-          done);
+          let f = Bigarray.Array1.get sum_data i in
+          Bigarray.Array1.set avg_data i (Float.sqrt (f *. n)));
       save_image img_avg file_name
     done
   ;;
