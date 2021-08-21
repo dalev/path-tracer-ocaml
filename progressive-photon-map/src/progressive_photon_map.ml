@@ -366,13 +366,14 @@ struct
       let n = 1 // (i + 1) in
       let sum_data = img_sum.Bimage.Image.data in
       let avg_data = img_avg.Bimage.Image.data in
+      let gamma x = x **. (1.0 /. 2.2) in
       Task.parallel_for
         pool
         ~start:0
         ~finish:((3 * width * height) - 1)
         ~body:(fun i ->
           let f = Bigarray.Array1.get sum_data i in
-          Bigarray.Array1.set avg_data i (Float.sqrt (f *. n)));
+          Bigarray.Array1.set avg_data i (gamma (f *. n)));
       save_image img_avg file_name
     done
   ;;
