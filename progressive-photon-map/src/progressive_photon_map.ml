@@ -332,18 +332,11 @@ struct
     printf "#photons/iter = %d\n" photon_count;
     printf "#iterations = %d\n" num_iterations;
     printf "-----\n%!";
-    let p_sampler = L.create ~dimensions:(2 + (2 * (max_bounces + 1))) in
+    let p_sampler = L.create ~dimensions:(2 + (2 * max_bounces)) in
     let e_sampler =
-      (* CR dalev:
-      this is extremely conservative: eye paths terminate at the first diffuse
-      interaction, so will rarely achieve max_bounces.  Using only a small
-      prefix of the high-dimensional sampler introduces visible artifacts
-      compared to just using a lower-dimensional sampler.  However, then you
-      run the risk of having to prematurely terminate a path with many specular
-      bounces.  Maybe a different low-discrepancy seq would perform better for
-      eye paths -- e.g., Halton?
-      *)
-      L.create ~dimensions:(2 + (max_bounces + 1))
+      (* eye paths terminate at the first diffuse interaction, and so they only use
+      one sample dimension per bounce. *)
+      L.create ~dimensions:(2 + max_bounces)
     in
     let img_sum = create_blank_image () in
     let img_avg = create_blank_image () in
