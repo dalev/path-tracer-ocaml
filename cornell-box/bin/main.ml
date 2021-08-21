@@ -86,7 +86,7 @@ let spheres () =
     Sphere.create ~material ~center ~radius
   in
   let behind_camera =
-    (* stick this here to prevent photons from vanishing into the great beyond *)
+    (* stick this here to prevent photons from escaping into the great beyond *)
     let material = Material.lambertian (solid_tex 0.75 0.75 0.75) in
     let radius = 10.0 in
     let center = P3.create ~x:0.5 ~y:0.5 ~z:(-2.0 -. radius) in
@@ -195,7 +195,7 @@ module Args = struct
     let width = ref 600 in
     let height = ref !width in
     let iterations = ref 10 in
-    let photon_count = ref 150_000 in
+    let photon_count = ref 75_000 in
     let file = ref "output.png" in
     let alpha = ref (2 // 3) in
     let no_progress = ref false in
