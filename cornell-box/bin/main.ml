@@ -254,11 +254,12 @@ let main argv =
   let light_center = P3.create ~x:0.5 ~y:0.82 ~z:0.5 in
   let _light_enclosure =
     let radius = 0.05 in
-    (* slightly off center from the light to create a visual effect *)
-    let center = P3.create ~x:0.5 ~y:0.85 ~z:0.5 in
+    (* slightly off center from the light to create a shadow along the walls *)
+    let center = P3.create ~x:0.5 ~y:0.80 ~z:0.5 in
     [ Shape.of_sphere @@ Sphere.create ~material:Material.glass ~center ~radius ]
   in
   let light_enclosure' =
+    (* a cube with the top and bottom open *)
     let quad p u v =
       let u = V3.scale u 2.0
       and v = V3.scale v 2.0 in
@@ -266,7 +267,7 @@ let main argv =
     in
     let r = 0.05 in
     let rx = V3.(scale unit_x r) in
-    let ry = V3.(scale unit_y 0.04) in
+    let ry = V3.(scale unit_y r) in
     let rz = V3.(scale unit_z r) in
     let open V3.Infix in
     let lc = P3.to_v3 light_center in
