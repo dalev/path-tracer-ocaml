@@ -249,7 +249,11 @@ let main argv =
     let eye = P3.create ~x:0.5 ~y:0.5 ~z:(-1.0) in
     let target = P3.create ~x:0.5 ~y:0.5 ~z:0.0 in
     let up = V3.unit_y in
-    Camera.create ~eye ~target ~up ~aspect ~vertical_fov_deg:45.0
+    let vertical_fov_deg =
+      let theta = 2.0 *. Float.atan 0.5 in
+      theta *. 180.0 /. Float.pi
+    in
+    Camera.create ~eye ~target ~up ~aspect ~vertical_fov_deg
   in
   let light_center = P3.create ~x:0.5 ~y:0.82 ~z:0.5 in
   let _light_enclosure =
