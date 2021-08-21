@@ -179,7 +179,9 @@ end = struct
           in
           loop [])
     in
-    (* CR dalev: reuses sampler for different lights, fix me *)
+    (* CR dalev: reuses sampler for different lights, fix me.  What we actually want
+    is to divide [photon_count] among all the lights in proportion to each light's
+    power. *)
     List.iter point_lights ~f:(fun light ->
         Task.parallel_for pool ~start:0 ~finish:(photon_count - 1) ~body:(fun i ->
             let s ~dimension = sampler ~offset:i ~dimension in
@@ -188,7 +190,8 @@ end = struct
     let photons = Caml.Domain.join collector in
     let length = List.length photons in
     if length = 0 then failwith "BUG: no photons";
-    { tree = Tree.create ~pool photons; length }
+    let num_bins = 8 in
+    { tree = Tree.create ~pool ~num_bins photons; length }
   ;;
 end
 
@@ -271,8 +274,7 @@ struct
               | [] -> Color.black
               | hd :: _ as neighbors ->
                 let radius = hd.Photon.radius in
-                let radius2 = Float.square radius in
-                let area = Float.pi * radius2 in
+                let area = Float.pi * Float.square radius in
                 let flux, total_weight =
                   List.fold
                     neighbors

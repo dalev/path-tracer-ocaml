@@ -121,8 +121,7 @@ module Proposal = struct
 
   let compare p1 p2 = Float.compare (cost p1) (cost p2)
 
-  let propose_split_one_axis shapes axis cbbox =
-    let num_bins = 32 in
+  let propose_split_one_axis ~num_bins shapes axis cbbox =
     let to_axis = P3.axis axis in
     let open Float.O in
     let epsilon = 1e-6 in
@@ -140,12 +139,12 @@ module Proposal = struct
       candidates bins to_bin axis |> List.min_elt ~compare)
   ;;
 
-  let create shapes =
+  let create ~num_bins shapes =
     let cbbox = Bshape.centroid_bbox shapes in
     match
       List.min_elt ~compare
       @@ List.filter_map Axis.all ~f:(fun axis ->
-             propose_split_one_axis shapes axis cbbox)
+             propose_split_one_axis ~num_bins shapes axis cbbox)
     with
     | v -> v
     | exception e -> Exn.reraisef e "shapes len = %d" (Slice.length shapes) ()
@@ -185,12 +184,12 @@ module Make (L : Leaf) = struct
       Leaf { bbox; leaf = L.of_elts (Slice.to_array_map shapes ~f:Bshape.shape) }
     ;;
 
-    let create ?pool bbox shapes =
+    let create ?pool ~num_bins bbox shapes =
       let rec loop bbox shapes ~depth =
         if Slice.length shapes <= L.length_cutoff
         then make_leaf bbox shapes
         else (
-          match Proposal.create shapes with
+          match Proposal.create ~num_bins shapes with
           | None -> make_leaf bbox shapes
           | Some p ->
             let leaf_cost = Proposal.leaf_cost (Slice.length shapes) in
@@ -284,7 +283,8 @@ module Make (L : Leaf) = struct
     loop slice []
   ;;
 
-  let create ?pool elts =
+  let create ?pool ?(num_bins = 32) elts =
+    assert (num_bins >= 4);
     if List.is_empty elts
     then failwith "Shape_tree.create: expected non-empty list of shapes";
     let elts = Array.of_list_map elts ~f:(Bshape.create L.elt_bbox) |> Slice.create in
@@ -298,7 +298,7 @@ module Make (L : Leaf) = struct
         in
         List.map tasks ~f:(Task.await pool) |> List.reduce_exn ~f:Bbox.union
     in
-    let root = Tree.create ?pool bbox elts in
+    let root = Tree.create ?pool ~num_bins bbox elts in
     { root }
   ;;
 end

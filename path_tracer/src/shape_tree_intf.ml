@@ -20,7 +20,9 @@ module Sig (L : Leaf) = struct
     type elt
     type elt_hit
 
-    val create : ?pool:Domainslib.Task.pool -> elt list -> t
+    (** default [num_bins] = 32 *)
+    val create : ?pool:Domainslib.Task.pool -> ?num_bins:int -> elt list -> t
+
     val depth : t -> int
     val length : t -> int
     val intersect : t -> Ray.t -> t_min:float -> t_max:float -> elt_hit option
