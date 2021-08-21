@@ -298,7 +298,7 @@ let main argv =
 
     let point_lights =
       let position = Camera.transform camera light_center in
-      [ Ppm.Point_light.create ~position ~power:400.0 ~color:Color.white ]
+      [ Ppm.Point_light.create ~position ~power:2.0 ~color:Color.white ]
     ;;
 
     let intersect ray =

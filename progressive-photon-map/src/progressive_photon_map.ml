@@ -6,12 +6,6 @@ module Task = Domainslib.Task
 
 type sampler = offset:int -> dimension:int -> float
 
-let normal_pdf ~mean ~stddev x =
-  let open Float.O in
-  Float.exp (-0.5 * Float.square ((x - mean) / stddev))
-  / (stddev * Float.sqrt (2.0 * Float.pi))
-;;
-
 module Point_light = struct
   type t =
     { position : P3.t
@@ -210,6 +204,8 @@ end) =
 struct
   open Scene
 
+  let inv_photon_count = 1 // photon_count
+
   let init_radius2 =
     let { P3.x; y; z } = P3.Infix.( - ) (Bbox.max bbox) (Bbox.min bbox) in
     let a = (x +. y +. z) /. 3.0 in
@@ -258,10 +254,8 @@ struct
                 let tgt = Photon.center p in
                 Float.sqrt @@ V3.quadrance (V3.of_points ~src:hit_point ~tgt)
               in
-              let weight p =
-                let stddev = p.Photon.radius / 3.0 in
-                normal_pdf ~mean:0.0 ~stddev (distance p)
-              in
+              let weight ~k ~r p = 1.0 - (distance p / (k * r)) in
+              let normalizer ~k = 1.0 - (2.0 / (3.0 * k)) in
               let neighbors =
                 Photon_map.fold_neighbors pmap hit_point ~init:[] ~f:(fun neighbors p ->
                     let p_ss = p.Photon.shader_space in
@@ -275,20 +269,20 @@ struct
               | hd :: _ as neighbors ->
                 let radius = hd.Photon.radius in
                 let area = Float.pi * Float.square radius in
-                let flux, total_weight =
-                  List.fold
-                    neighbors
-                    ~init:(Color.black, 0.0)
-                    ~f:(fun (sum_flux, sum_weight) p ->
+                let k = Float.of_int @@ List.length neighbors in
+                let normalizer = normalizer ~k in
+                let weight = weight ~k ~r:radius in
+                let flux =
+                  List.fold neighbors ~init:Color.black ~f:(fun sum_flux p ->
                       let w = weight p in
                       (* CR dalev: do we need to divide by pdf of eye ray bouncing towards the incoming photon? *)
                       (* let pdf = V3.dot hit_normal p.Photon.wi / Float.pi in *)
                       let pdf = 1.0 in
                       let flux = Color.scale p.Photon.flux (w / pdf) in
-                      Color.Infix.(sum_flux + flux), sum_weight + w)
+                      Color.Infix.(sum_flux + flux))
                 in
                 let open Color.Infix in
-                Color.scale (beta * flux) (1.0 / (area *. total_weight)))))
+                Color.scale (beta * flux) (1.0 / (area *. normalizer)))))
       in
       let dx = sampler ~dimension:0
       and dy = sampler ~dimension:1 in
@@ -297,7 +291,6 @@ struct
       let dimension = 2 in
       loop (Camera.ray camera cx cy) Color.white max_bounces dimension
     in
-    let pmap_length = Photon_map.length pmap in
     Task.parallel_for
       ~chunk_size:(32 * 32)
       pool
@@ -308,7 +301,7 @@ struct
         and y = pixel / width in
         let sampler ~dimension = sampler ~offset:pixel ~dimension in
         let color' = estimate_color ~x ~y sampler in
-        let color = Color.scale color' (1.0 /. Float.of_int pmap_length) in
+        let color = Color.scale color' inv_photon_count in
         write_pixel ~x ~y color)
   ;;
 
