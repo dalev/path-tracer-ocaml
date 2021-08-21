@@ -254,8 +254,10 @@ struct
                 let tgt = Photon.center p in
                 Float.sqrt @@ V3.quadrance (V3.of_points ~src:hit_point ~tgt)
               in
-              let weight ~k ~r p = 1.0 - (distance p / (k * r)) in
-              let normalizer ~k = 1.0 - (2.0 / (3.0 * k)) in
+              (* This is the cone filter suggested in 'Global Illumination Using Photon Maps' [Jensen 1996] *)
+              let k = 1.0 in
+              let weight ~radius p = 1.0 - (distance p / (k * radius)) in
+              let normalizer = 1.0 - (2.0 / (3.0 * k)) in
               let neighbors =
                 Photon_map.fold_neighbors pmap hit_point ~init:[] ~f:(fun neighbors p ->
                     let p_ss = p.Photon.shader_space in
@@ -269,16 +271,13 @@ struct
               | hd :: _ as neighbors ->
                 let radius = hd.Photon.radius in
                 let area = Float.pi * Float.square radius in
-                let k = Float.of_int @@ List.length neighbors in
-                let normalizer = normalizer ~k in
-                let weight = weight ~k ~r:radius in
                 let flux =
                   List.fold neighbors ~init:Color.black ~f:(fun sum_flux p ->
-                      let w = weight p in
                       (* CR dalev: do we need to divide by pdf of eye ray bouncing towards the incoming photon? *)
                       (* let pdf = V3.dot hit_normal p.Photon.wi / Float.pi in *)
                       let pdf = 1.0 in
-                      let flux = Color.scale p.Photon.flux (w / pdf) in
+                      let w = weight ~radius p / pdf in
+                      let flux = Color.scale p.Photon.flux w in
                       Color.Infix.(sum_flux + flux))
                 in
                 let open Color.Infix in

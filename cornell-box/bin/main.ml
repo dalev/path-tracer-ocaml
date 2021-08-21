@@ -86,6 +86,7 @@ let spheres () =
     Sphere.create ~material ~center ~radius
   in
   let behind_camera =
+    (* stick this here to prevent photons from vanishing into the great beyond *)
     let material = Material.lambertian (solid_tex 0.75 0.75 0.75) in
     let radius = 10.0 in
     let center = P3.create ~x:0.5 ~y:0.5 ~z:(-2.0 -. radius) in
