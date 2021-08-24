@@ -291,15 +291,7 @@ end) =
 struct
   open Scene
 
-  let { Args.photon_count
-      ; width
-      ; height
-      ; alpha
-      ; iterations
-      ; max_bounces
-      ; output = file_name
-      }
-    =
+  let { Args.photon_count; width; height; alpha; iterations; max_bounces; output = _ } =
     args
   ;;
 
@@ -419,14 +411,31 @@ struct
     L.get s ~offset:(offset + base) ~dimension
   ;;
 
-  let save_image img =
-    match Bimage_io.write file_name img with
-    | Ok () -> ()
-    | Error (`File_not_found s) -> failwith @@ "file not found: " ^ s
-    | Error (#Bimage.Error.t as e) -> Bimage.Error.exc e
+  let save_mtx = Caml.Mutex.create ()
+
+  let save_image pool bimg_output ~img_avg ~img_sum n =
+    let one_over_n = 1 // n in
+    let sum_data = img_sum.Bimage.Image.data in
+    let avg_data = img_avg.Bimage.Image.data in
+    let gamma x = x **. (1.0 /. 2.2) in
+    Caml.Mutex.lock save_mtx;
+    Exn.protect
+      ~f:(fun () ->
+        Task.parallel_for
+          pool
+          ~start:0
+          ~finish:((3 * width * height) - 1)
+          ~body:(fun i ->
+            let f = Bigarray.Array1.get sum_data i in
+            Bigarray.Array1.set avg_data i (gamma (f *. one_over_n)));
+        match Bimage_io.Output.write ~append:false bimg_output img_avg with
+        | Ok () -> ()
+        | Error (`File_not_found s) -> failwith @@ "file not found: " ^ s
+        | Error (#Bimage.Error.t as e) -> Bimage.Error.exc e)
+      ~finally:(fun () -> Caml.Mutex.unlock save_mtx)
   ;;
 
-  let go pool =
+  let go pool bimg_output =
     printf "#max-bounces = %d\n" max_bounces;
     printf "#photons/iter = %d\n" photon_count;
     printf "#iterations = %d\n" iterations;
@@ -455,18 +464,8 @@ struct
       printf "  photon map length = %d\n%!" (Photon_map.length pmap);
       let eye_sample_base = i * width * height in
       render_image img_sum pool (offset_sampler e_sampler eye_sample_base) pmap;
-      let n = 1 // (i + 1) in
-      let sum_data = img_sum.Bimage.Image.data in
-      let avg_data = img_avg.Bimage.Image.data in
-      let gamma x = x **. (1.0 /. 2.2) in
-      Task.parallel_for
-        pool
-        ~start:0
-        ~finish:((3 * width * height) - 1)
-        ~body:(fun i ->
-          let f = Bigarray.Array1.get sum_data i in
-          Bigarray.Array1.set avg_data i (gamma (f *. n)));
-      save_image img_avg
+      let n = i + 1 in
+      save_image pool bimg_output ~img_avg ~img_sum n
     done
   ;;
 end

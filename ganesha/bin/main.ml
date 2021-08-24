@@ -132,7 +132,7 @@ let with_elapsed_time f =
 ;;
 
 let main { Args.common; ganesha_ply; stop_after_bvh } =
-  let { Common_args.width; height; _ } = common in
+  let { Common_args.width; height; output; _ } = common in
   let camera = camera (width // height) in
   let ganesha_ply = load_ply_exn ganesha_ply in
   let mesh = Mesh.create ganesha_ply camera in
@@ -239,7 +239,12 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
       ;;
     end)
   in
-  let elapsed_ns, () = with_elapsed_time (fun () -> Ppm.go pool) in
+  let output =
+    match Bimage_io.Output.create output with
+    | Ok t -> t
+    | Error _ -> failwith "cannot create output"
+  in
+  let elapsed_ns, () = with_elapsed_time (fun () -> Ppm.go pool output) in
   printf "elapsed ms: %.3f\n" @@ (Float.of_int63 elapsed_ns *. 1e-6);
   Domainslib.Task.teardown_pool pool
 ;;
