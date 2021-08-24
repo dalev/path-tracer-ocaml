@@ -9,6 +9,5 @@
   stdio
   path_tracer
   ply_format
-  render_command
   triangle
   progressive_photon_map))
