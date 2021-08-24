@@ -4,7 +4,7 @@ open Path_tracer
 open Ply_format
 module Bigstring = Base_bigstring
 module FArray = Caml.Float.Array
-module Common_args = Render_command.Args
+module Common_args = Progressive_photon_map.Args
 
 module Args = struct
   type t =
@@ -32,14 +32,6 @@ let camera aspect =
   let target = P3.create ~x:328.0 ~y:10.0 ~z:0.0 in
   let up = V3.create ~x:(-0.00212272) ~y:0.998201 ~z:(-0.0599264) in
   Camera.create ~eye ~target ~up ~aspect ~vertical_fov_deg:30.0
-;;
-
-let background =
-  let escape_color = Color.create ~r:0.5 ~g:0.7 ~b:1.0 in
-  fun ray ->
-    let d = V3.normalize (Ray.direction ray) in
-    let t = 0.5 *. (V3.dot d V3.unit_y +. 1.0) in
-    Color.lerp t Color.white escape_color
 ;;
 
 module Mesh = struct
@@ -200,10 +192,26 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
     (* we don't support texture mapping yet, so just hard-coding this to green *)
     Material.lambertian (Texture.solid (Color.create ~r:0.0 ~g:0.7 ~b:0.1))
   in
-  let module Render_cmd =
-    Render_command.Make (struct
-      let background = background
+  let module Ppm =
+    Progressive_photon_map.Make (struct
       let camera = camera
+
+      let bbox =
+        let b = Triangles.bbox tree in
+        printf "ganesha bbox = %s\n" @@ Sexp.to_string_mach ([%sexp_of: Bbox.t] b);
+        b
+      ;;
+
+      let lights =
+        [ Progressive_photon_map.Light.create_spot
+            ~position:(P3.create ~x:0.0 ~y:0.0 ~z:1.0)
+            ~direction:V3.Infix.(~-V3.unit_z)
+            ~color:Color.white
+            ~power:1000.0
+        ]
+      ;;
+
+      let args = common
 
       let intersect r =
         match Triangles.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value with
@@ -225,8 +233,9 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
       ;;
     end)
   in
-  Render_cmd.run ~pool common;
-  Domainslib.Task.teardown_pool pool
+  let elapsed_ns, () = Render_command.with_elapsed_time (fun () -> Ppm.go pool) in
+  Domainslib.Task.teardown_pool pool;
+  printf "elapsed ms: %.3f\n" @@ (Float.of_int63 elapsed_ns *. 1e-6)
 ;;
 
 let () = main (Args.parse ())
