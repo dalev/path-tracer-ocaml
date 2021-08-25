@@ -91,7 +91,7 @@ module Spot_light = struct
     ; color : Color.t
     }
 
-  let angle = 0.5 *. 30.0 *. Float.pi /. 180.0
+  let angle = 0.5 *. 45.0 *. Float.pi /. 180.0
   let disk_radius = Float.atan angle
 
   let create ~position ~direction ~color ~power =

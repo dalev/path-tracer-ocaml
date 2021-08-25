@@ -112,11 +112,7 @@ struct
 
     let[@inline] vertices t = point t.a, point t.b, point t.c
     let tex_coords _ = t00, t01, t11
-
-    let material _ =
-      (* we don't support texture mapping yet, so just hard-coding this to green *)
-      Material.lambertian (Texture.solid (Color.create ~r:0.0 ~g:0.7 ~b:0.1))
-    ;;
+    let material _ = Material.glass
   end
 
   include Triangle.Make (Face)
@@ -270,11 +266,19 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
       let bbox = ganesha_bbox
 
       let lights =
-        [ Progressive_photon_map.Light.create_spot
+        let module L = Progressive_photon_map.Light in
+        [ (let position =
+             let v = V3.of_points ~tgt:(Bbox.max bbox) ~src:(Bbox.center bbox) in
+             P3.translate (Bbox.max bbox)
+             @@ V3.Infix.(V3.scale v 3.0 + V3.(scale unit_z (-200.0)))
+           in
+           let direction = V3.of_points ~src:position ~tgt:(Bbox.center bbox) in
+           L.create_spot ~position ~direction ~color:Color.white ~power:2500.0)
+        ; L.create_spot
             ~position:(P3.create ~x:0.0 ~y:0.0 ~z:1.0)
             ~direction:V3.Infix.(~-V3.unit_z)
             ~color:Color.white
-            ~power:1000.0
+            ~power:1500.0
         ]
       ;;
 
