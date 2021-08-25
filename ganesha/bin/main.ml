@@ -34,6 +34,11 @@ let camera aspect =
   Camera.create ~eye ~target ~up ~aspect ~vertical_fov_deg:30.0
 ;;
 
+let t00 = Texture.Coord.create 0.0 0.0
+let t01 = Texture.Coord.create 0.0 1.0
+let t10 = Texture.Coord.create 1.0 0.0
+let t11 = Texture.Coord.create 1.0 1.0
+
 module Mesh = struct
   type t =
     { xs : floatarray
@@ -106,6 +111,12 @@ struct
     ;;
 
     let[@inline] vertices t = point t.a, point t.b, point t.c
+    let tex_coords _ = t00, t01, t11
+
+    let material _ =
+      (* we don't support texture mapping yet, so just hard-coding this to green *)
+      Material.lambertian (Texture.solid (Color.create ~r:0.0 ~g:0.7 ~b:0.1))
+    ;;
   end
 
   include Triangle.Make (Face)
@@ -136,14 +147,14 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
   let camera = camera (width // height) in
   let ganesha_ply = load_ply_exn ganesha_ply in
   let mesh = Mesh.create ganesha_ply camera in
-  let module Triangle =
+  let module Mesh_triangle =
     Make_triangle [@inlined] (struct
       let mesh = mesh
     end)
   in
   let module Leaf =
     Shape_tree.Array_leaf (struct
-      include Triangle
+      include Mesh_triangle
 
       type hit = Hit.t
 
@@ -171,9 +182,9 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
     ;;
   end
   in
-  let triangles : Triangle.t list =
+  let triangles : Mesh_triangle.t list =
     let f = function
-      | [| a; b; c |] -> { Triangle.Face.a; b; c }
+      | [| a; b; c |] -> { Mesh_triangle.Face.a; b; c }
       | _ -> failwith "expected triangular face"
     in
     Array.to_list @@ Array.map ~f mesh.Mesh.faces
@@ -194,19 +205,66 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
   then (
     printf "Stop after bvh build\n";
     Caml.exit 0);
-  let ganesha_material =
-    (* we don't support texture mapping yet, so just hard-coding this to green *)
-    Material.lambertian (Texture.solid (Color.create ~r:0.0 ~g:0.7 ~b:0.1))
+  let ganesha_bbox = Triangles.bbox tree in
+  printf "ganesha bbox = %s\n" @@ Sexp.to_string_mach ([%sexp_of: Bbox.t] ganesha_bbox);
+  let module Floor = struct
+    (* this is already in camera-space *)
+    let center =
+      let { P3.x; z; y = _ } = Bbox.center ganesha_bbox in
+      let y = (Bbox.min ganesha_bbox).P3.y in
+      P3.create ~x ~y ~z
+    ;;
+
+    let x', z' =
+      let s = 50. in
+      V3.(scale unit_x s), V3.(scale unit_z s)
+    ;;
+
+    let checker =
+      let solid_tex r g b = Texture.solid (Color.create ~r ~g ~b) in
+      let a = solid_tex 0.2 0.3 0.1 in
+      let b = solid_tex 0.9 0.9 0.9 in
+      Material.lambertian @@ Texture.checker ~width:10 ~height:10 a b
+    ;;
+
+    let a = t00, P3.translate center V3.Infix.(~-(x' + z'))
+    let b = t01, P3.translate (snd a) (V3.scale x' 2.0)
+    let c = t11, P3.translate (snd b) (V3.scale z' 2.0)
+    let d = t10, P3.translate (snd a) (V3.scale z' 2.0)
+
+    module Face = struct
+      type t =
+        { vertices : P3.t * P3.t * P3.t
+        ; texs : Texture.Coord.t * Texture.Coord.t * Texture.Coord.t
+        }
+
+      let vertices t = t.vertices
+      let tex_coords t = t.texs
+      let material _ = checker
+      let create a b c = { vertices = snd a, snd b, snd c; texs = fst a, fst b, fst c }
+    end
+
+    module Tri = Triangle.Make (Face)
+
+    let f1 = Face.create a b c
+    let f2 = Face.create a c d
+
+    let intersect r =
+      let t_min = 0.
+      and t_max = Float.max_finite_value in
+      match Tri.intersect f1 r ~t_min ~t_max with
+      | Some th -> Some (Tri.Hit.to_hit th r)
+      | None ->
+        (match Tri.intersect f2 r ~t_min ~t_max with
+        | Some th -> Some (Tri.Hit.to_hit th r)
+        | None -> None)
+    ;;
+  end
   in
   let module Ppm =
     Progressive_photon_map.Make (struct
       let camera = camera
-
-      let bbox =
-        let b = Triangles.bbox tree in
-        printf "ganesha bbox = %s\n" @@ Sexp.to_string_mach ([%sexp_of: Bbox.t] b);
-        b
-      ;;
+      let bbox = ganesha_bbox
 
       let lights =
         [ Progressive_photon_map.Light.create_spot
@@ -219,23 +277,15 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
 
       let args = common
 
+      (* want to add a floor and perhaps walls to this scene, but those
+      triangles are separate from the mesh triangles *)
       let intersect r =
-        match Triangles.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value with
-        | None -> None
-        | Some tri_hit ->
-          let open Float.O in
-          let module H = Triangle.Hit in
-          let g_normal = H.g_normal tri_hit in
-          let pt = H.point tri_hit in
-          let tex_coord = H.tex_coord tri_hit in
-          let hit_front = V3.dot (Ray.direction r) g_normal < 0.0 in
-          let normal = if hit_front then g_normal else V3.Infix.( ~- ) g_normal in
-          let ss = Shader_space.create normal pt in
-          let wi = Shader_space.omega_i ss r in
-          let do_scatter =
-            Material.scatter ganesha_material ss tex_coord ~omega_i:wi ~hit_front
-          in
-          Some { Hit.shader_space = ss; emit = Color.black; do_scatter }
+        match Floor.intersect r with
+        | Some _ as h -> h
+        | None ->
+          (match Triangles.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value with
+          | None -> None
+          | Some tri_hit -> Some (Mesh_triangle.Hit.to_hit tri_hit r))
       ;;
     end)
   in

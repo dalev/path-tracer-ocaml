@@ -5,6 +5,8 @@ module Make (Face : sig
   type t
 
   val vertices : t -> P3.t * P3.t * P3.t
+  val material : t -> Material.t
+  val tex_coords : t -> Texture.Coord.t * Texture.Coord.t * Texture.Coord.t
 end) : sig
   type t = Face.t
 
@@ -12,11 +14,7 @@ end) : sig
     type t
 
     val t_hit : t -> float
-    val g_normal : t -> V3.t
-    val point : t -> P3.t
-    val tex_coord : t -> Texture.Coord.t
-    val barycentric : t -> float * float
-    val face : t -> Face.t
+    val to_hit : t -> Ray.t -> Path_tracer.Hit.t
   end
 
   val bbox : t -> Bbox.t

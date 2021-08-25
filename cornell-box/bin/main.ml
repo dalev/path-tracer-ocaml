@@ -10,6 +10,8 @@ module Face = struct
     }
 
   let vertices t = t.vertices
+  let material t = t.material
+  let tex_coords t = t.texs
 end
 
 module Triangle = struct
@@ -18,8 +20,6 @@ module Triangle = struct
   let create ~material (a, ta) (b, tb) (c, tc) =
     { Face.material; vertices = a, b, c; texs = ta, tb, tc }
   ;;
-
-  let material t = t.Face.material
 
   let transform t ~f =
     let a, b, c = Face.vertices t in
@@ -135,28 +135,7 @@ end = struct
     let to_scatter t ray =
       match t with
       | S { t_hit; sphere } -> Sphere.hit sphere t_hit ray
-      | T tri_hit ->
-        let open Float.O in
-        let module H = Triangle.Hit in
-        let tri = H.face tri_hit in
-        let g_normal = H.g_normal tri_hit in
-        let pt = H.point tri_hit in
-        let tex_coord =
-          let module C = Texture.Coord in
-          let ta, tb, tc = tri.texs in
-          let u, v = H.barycentric tri_hit in
-          let w = 1.0 - u - v in
-          let tu = (ta.u * w) + (tb.u * u) + (tc.u * v)
-          and tv = (ta.v * w) + (tb.v * u) + (tc.v * v) in
-          C.create tu tv
-        in
-        let hit_front = V3.dot (Ray.direction ray) g_normal < 0.0 in
-        let normal = if hit_front then g_normal else V3.Infix.( ~- ) g_normal in
-        let ss = Shader_space.create normal pt in
-        let wi = Shader_space.omega_i ss ray in
-        let material = Triangle.material tri in
-        let do_scatter = Material.scatter material ss tex_coord ~omega_i:wi ~hit_front in
-        { Hit.shader_space = ss; emit = Color.black; do_scatter }
+      | T tri_hit -> Triangle.Hit.to_hit tri_hit ray
     ;;
   end
 

@@ -5,6 +5,8 @@ module Make (Face : sig
   type t
 
   val vertices : t -> P3.t * P3.t * P3.t
+  val material : t -> Material.t
+  val tex_coords : t -> Texture.Coord.t * Texture.Coord.t * Texture.Coord.t
 end) =
 struct
   include Face
@@ -36,8 +38,30 @@ struct
     ;;
 
     let barycentric t = t.u, t.v
-    let tex_coord t = Texture.Coord.create t.u t.v
     let face t = t.tri
+
+    let to_hit tri_hit r =
+      let open Float.O in
+      let g_normal = g_normal tri_hit in
+      let pt = point tri_hit in
+      let tex_coord =
+        let module C = Texture.Coord in
+        let ta, tb, tc = tex_coords (face tri_hit) in
+        let u, v = barycentric tri_hit in
+        let w = 1.0 - u - v in
+        let tu = (ta.u * w) + (tb.u * u) + (tc.u * v)
+        and tv = (ta.v * w) + (tb.v * u) + (tc.v * v) in
+        C.create tu tv
+      in
+      let hit_front = V3.dot (Ray.direction r) g_normal < 0.0 in
+      let normal = if hit_front then g_normal else V3.Infix.( ~- ) g_normal in
+      let ss = Shader_space.create normal pt in
+      let wi = Shader_space.omega_i ss r in
+      let do_scatter =
+        Material.scatter (material (face tri_hit)) ss tex_coord ~omega_i:wi ~hit_front
+      in
+      { Path_tracer.Hit.shader_space = ss; emit = Color.black; do_scatter }
+    ;;
   end
 
   let bbox t =
