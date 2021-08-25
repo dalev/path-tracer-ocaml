@@ -28,7 +28,7 @@ module Args = struct
 end
 
 let camera aspect =
-  let eye = P3.create ~x:328.0 ~y:40.282 ~z:245.0 in
+  let eye = P3.create ~x:328.0 ~y:70.282 ~z:345.0 in
   let target = P3.create ~x:328.0 ~y:10.0 ~z:0.0 in
   let up = V3.create ~x:(-0.00212272) ~y:0.998201 ~z:(-0.0599264) in
   Camera.create ~eye ~target ~up ~aspect ~vertical_fov_deg:30.0
@@ -280,8 +280,6 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
 
       let args = common
 
-      (* want to add a floor and perhaps walls to this scene, but those
-      triangles are separate from the mesh triangles *)
       let intersect r =
         let t_min = 0.0 in
         match Floor.intersect r with
