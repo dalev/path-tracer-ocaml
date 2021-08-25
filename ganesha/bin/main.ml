@@ -216,7 +216,7 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
     ;;
 
     let x', z' =
-      let s = 50. in
+      let s = 500. in
       V3.(scale unit_x s), V3.(scale unit_z s)
     ;;
 
@@ -224,7 +224,7 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
       let solid_tex r g b = Texture.solid (Color.create ~r ~g ~b) in
       let a = solid_tex 0.2 0.3 0.1 in
       let b = solid_tex 0.9 0.9 0.9 in
-      Material.lambertian @@ Texture.checker ~width:10 ~height:10 a b
+      Material.lambertian @@ Texture.checker ~width:100 ~height:100 a b
     ;;
 
     let a = t00, P3.translate center V3.Infix.(~-(x' + z'))
@@ -253,12 +253,15 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
       let t_min = 0.
       and t_max = Float.max_finite_value in
       match Tri.intersect f1 r ~t_min ~t_max with
-      | Some th -> Some (Tri.Hit.to_hit th r)
+      | Some _ as h -> h
       | None ->
         (match Tri.intersect f2 r ~t_min ~t_max with
-        | Some th -> Some (Tri.Hit.to_hit th r)
+        | Some _ as h -> h
         | None -> None)
     ;;
+
+    let to_hit t ray = Tri.Hit.to_hit t ray
+    let t_hit t = Tri.Hit.t_hit t
   end
   in
   let module Ppm =
@@ -280,8 +283,13 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
       (* want to add a floor and perhaps walls to this scene, but those
       triangles are separate from the mesh triangles *)
       let intersect r =
+        let t_min = 0.0 in
         match Floor.intersect r with
-        | Some _ as h -> h
+        | Some h ->
+          let t_max = Floor.t_hit h in
+          (match Triangles.intersect tree r ~t_min ~t_max with
+          | None -> Some (Floor.to_hit h r)
+          | Some tri_hit -> Some (Mesh_triangle.Hit.to_hit tri_hit r))
         | None ->
           (match Triangles.intersect tree r ~t_min:0.0 ~t_max:Float.max_finite_value with
           | None -> None
