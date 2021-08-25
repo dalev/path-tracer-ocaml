@@ -273,12 +273,12 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
              @@ V3.Infix.(V3.scale v 3.0 + V3.(scale unit_z (-200.0)))
            in
            let direction = V3.of_points ~src:position ~tgt:(Bbox.center bbox) in
-           L.create_spot ~position ~direction ~color:Color.white ~power:2500.0)
+           L.create_spot ~position ~direction ~color:Color.white ~power:10000.0)
         ; L.create_spot
             ~position:(P3.create ~x:0.0 ~y:0.0 ~z:1.0)
             ~direction:V3.Infix.(~-V3.unit_z)
             ~color:Color.white
-            ~power:1500.0
+            ~power:3000.0
         ]
       ;;
 
