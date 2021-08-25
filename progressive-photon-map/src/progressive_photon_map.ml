@@ -127,6 +127,11 @@ module Light = struct
     | Spot l -> l.Spot_light.color
   ;;
 
+  let power t =
+    let { V3.x; y; z } = Color.to_v3 @@ color t in
+    x +. y +. z
+  ;;
+
   let create_spot ~position ~direction ~color ~power =
     Spot (Spot_light.create ~position ~direction ~color ~power)
   ;;
@@ -265,11 +270,15 @@ end = struct
           in
           loop [])
     in
-    (* CR dalev: reuses sampler for different lights, fix me.  What we actually want
-    is to divide [photon_count] among all the lights in proportion to each light's
-    power. *)
+    let total_power = List.sum (module Float) lights ~f:Light.power in
+    let offset = ref 0 in
     List.iter lights ~f:(fun light ->
-        Task.parallel_for pool ~start:0 ~finish:(photon_count - 1) ~body:(fun i ->
+        let f = Light.power light /. total_power in
+        let photon_count = Int.of_float @@ (Float.of_int photon_count *. f) in
+        let start = !offset in
+        let finish = start + photon_count - 1 in
+        offset := finish + 1;
+        Task.parallel_for pool ~start ~finish ~body:(fun i ->
             let s ~dimension = sampler ~offset:i ~dimension in
             Chan.send c @@ Some (trace_photon light s max_bounces scene_intersect ~radius)));
     Chan.send c None;

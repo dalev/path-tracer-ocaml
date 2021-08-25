@@ -212,7 +212,7 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
     ;;
 
     let x', z' =
-      let s = 500. in
+      let s = 5000. in
       V3.(scale unit_x s), V3.(scale unit_z s)
     ;;
 
@@ -220,7 +220,7 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
       let solid_tex r g b = Texture.solid (Color.create ~r ~g ~b) in
       let a = solid_tex 0.2 0.3 0.1 in
       let b = solid_tex 0.9 0.9 0.9 in
-      Material.lambertian @@ Texture.checker ~width:100 ~height:100 a b
+      Material.lambertian @@ Texture.checker ~width:500 ~height:500 a b
     ;;
 
     let a = t00, P3.translate center V3.Infix.(~-(x' + z'))
