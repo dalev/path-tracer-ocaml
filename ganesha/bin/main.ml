@@ -270,7 +270,7 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
         [ (let position =
              let v = V3.of_points ~tgt:(Bbox.max bbox) ~src:(Bbox.center bbox) in
              P3.translate (Bbox.max bbox)
-             @@ V3.Infix.(V3.scale v 3.0 + V3.(scale unit_z (-200.0)))
+             @@ V3.Infix.(V3.scale v 3.0 + V3.(scale unit_z (-400.0)))
            in
            let direction = V3.of_points ~src:position ~tgt:(Bbox.center bbox) in
            L.create_spot ~position ~direction ~color:Color.white ~power:10000.0)
