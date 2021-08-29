@@ -34,11 +34,6 @@ let camera aspect =
   Camera.create ~eye ~target ~up ~aspect ~vertical_fov_deg:30.0
 ;;
 
-let t00 = Texture.Coord.create 0.0 0.0
-let t01 = Texture.Coord.create 0.0 1.0
-let t10 = Texture.Coord.create 1.0 0.0
-let t11 = Texture.Coord.create 1.0 1.0
-
 module Mesh = struct
   type t =
     { xs : floatarray
@@ -111,7 +106,7 @@ struct
     ;;
 
     let[@inline] vertices t = point t.a, point t.b, point t.c
-    let tex_coords _ = t00, t01, t11
+    let tex_coords _ = Texture.Coord.(t00, t01, t11)
     let material _ = Material.glass
   end
 
@@ -223,10 +218,10 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
       Material.lambertian @@ Texture.checker ~width:500 ~height:500 a b
     ;;
 
-    let a = t00, P3.translate center V3.Infix.(~-(x' + z'))
-    let b = t01, P3.translate (snd a) (V3.scale x' 2.0)
-    let c = t11, P3.translate (snd b) (V3.scale z' 2.0)
-    let d = t10, P3.translate (snd a) (V3.scale z' 2.0)
+    let a = Texture.Coord.t00, P3.translate center V3.Infix.(~-(x' + z'))
+    let b = Texture.Coord.t01, P3.translate (snd a) (V3.scale x' 2.0)
+    let c = Texture.Coord.t11, P3.translate (snd b) (V3.scale z' 2.0)
+    let d = Texture.Coord.t10, P3.translate (snd a) (V3.scale z' 2.0)
 
     module Face = struct
       type t =

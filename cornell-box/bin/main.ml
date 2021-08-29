@@ -40,16 +40,11 @@ let triangle_fan ~material pts =
   loop (List.tl_exn pts) []
 ;;
 
-let t00 = Texture.Coord.create 0.0 0.0
-let t01 = Texture.Coord.create 0.0 1.0
-let t10 = Texture.Coord.create 1.0 0.0
-let t11 = Texture.Coord.create 1.0 1.0
-
 let quad ~material a u v =
   let b = P3.translate a v in
   let c = P3.translate b u in
   let d = P3.translate a u in
-  triangle_fan ~material [ a, t00; b, t10; c, t11; d, t01 ]
+  triangle_fan ~material Texture.Coord.[ a, t00; b, t10; c, t11; d, t01 ]
 ;;
 
 let solid_tex r g b = Texture.solid (Color.create ~r ~g ~b)
