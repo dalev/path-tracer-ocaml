@@ -107,7 +107,10 @@ struct
                in
                let module C = Domainslib.Chan in
                let c = C.make_bounded 8 in
-               Progress.with_reporter p (fun report ->
+               let config =
+                 Progress.Config.v ~min_interval:(Some Progress.Duration.second) ()
+               in
+               Progress.with_reporter ~config p (fun report ->
                    let update_progress () = C.send c 1 in
                    let d =
                      Caml.Domain.spawn (fun () ->

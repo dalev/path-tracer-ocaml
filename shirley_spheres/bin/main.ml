@@ -42,7 +42,7 @@ module Shirley_spheres = struct
   let big_spheres =
     let glass = Material.glass in
     let metal = Material.metal (solid_tex 0.7 0.6 0.5) in
-    let blue = solid_lambertian 0.0 0.1 0.4 in
+    let blue = solid_lambertian 0.1 0.1 0.7 in
     let radius = 1.0 in
     [ Sphere.create ~material:glass ~center:(p3 (-4.0) 1.0 0.0) ~radius
     ; Sphere.create ~material:metal ~center:(p3 0.0 1.0 0.0) ~radius
@@ -115,7 +115,7 @@ module Array_leaf : Leaf_S = Shape_tree.Array_leaf (struct
   type hit = float * Sphere.t
 
   let hit_t = fst
-  let length_cutoff = 8
+  let length_cutoff = 4
   let depth _ = 0
   let length _ = 1
 

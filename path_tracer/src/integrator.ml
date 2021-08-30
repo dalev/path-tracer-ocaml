@@ -114,7 +114,7 @@ let render_tile t tile tile_sampler =
 ;;
 
 let create_tile_samplers t tiles =
-  let s = ref (L.create ~dimension:(2 + (2 * (t.max_bounces + 1)))) in
+  let s = ref (L.create ~dimension:(2 + (2 * t.max_bounces))) in
   List.map tiles ~f:(fun tile ->
       let n = t.samples_per_pixel * Tile.area tile in
       let tile_sampler, suffix = L.split_at !s n in
