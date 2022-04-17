@@ -75,6 +75,7 @@ mod simd {
     #[cfg(target_arch = "x86_64")]
     use core::arch::x86_64::*;
 
+    #[cfg(target_arch = "x86_64")]
     #[inline(always)]
     pub unsafe fn dot4(
         vx: __m256d,
@@ -87,6 +88,7 @@ mod simd {
         _mm256_fmadd_pd(vx, wx, _mm256_fmadd_pd(vy, wy, _mm256_mul_pd(vz, wz)))
     }
 
+    #[cfg(target_arch = "x86_64")]
     #[inline(always)]
     pub unsafe fn quadrance(vx: __m256d, vy: __m256d, vz: __m256d) -> __m256d {
         dot4(vx, vy, vz, vx, vy, vz)
