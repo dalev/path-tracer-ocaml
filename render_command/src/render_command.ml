@@ -65,10 +65,7 @@ module Make (Scene : sig
   val background : Ray.t -> Color.t
 end) =
 struct
-  let run
-      ?pool
-      { Args.width; height; max_bounces; samples_per_pixel; no_progress; output }
-    =
+  let run { Args.width; height; max_bounces; samples_per_pixel; no_progress; output } =
     let img = mkImage width height in
     let write_pixel ~x ~y color =
       let r, g, b = Color.to_rgb color in
@@ -92,7 +89,7 @@ struct
       fst
       @@ with_elapsed_time (fun () ->
              if no_progress
-             then Integrator.render i ?pool ~update_progress:ignore
+             then Integrator.render i ~update_progress:ignore
              else (
                let total = Integrator.count_tiles i in
                let p =
@@ -105,29 +102,16 @@ struct
                    ; spacer 4
                    ]
                in
-               let module C = Domainslib.Chan in
-               let c = C.make_bounded 8 in
                let config =
                  Progress.Config.v ~min_interval:(Some Progress.Duration.second) ()
                in
                Progress.with_reporter ~config p (fun report ->
-                   let update_progress () = C.send c 1 in
-                   let d =
-                     Caml.Domain.spawn (fun () ->
-                         let remaining = ref total in
-                         while !remaining > 0 do
-                           let m = C.recv c in
-                           remaining := !remaining - m;
-                           report m
-                         done)
-                   in
-                   Integrator.render i ~update_progress;
-                   Caml.Domain.join d)))
+                   let update_progress () = report 1 in
+                   Integrator.render i ~update_progress)))
     in
     let () =
-      match Bimage_io.write output img with
+      match Bimage_unix.Stb.write output img with
       | Ok () -> ()
-      | Error (`File_not_found f) -> printf "File not found: %s" f
       | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other)
     in
     printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6)

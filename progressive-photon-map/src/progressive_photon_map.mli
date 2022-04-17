@@ -38,5 +38,5 @@ module Make (Scene : sig
   val intersect : Path_tracer.Ray.t -> Path_tracer.Hit.t option
   val args : Args.t
 end) : sig
-  val go : Domainslib.Task.pool -> Bimage_io.Output.t -> unit
+  val go : output:string -> unit
 end

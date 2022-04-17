@@ -1,11 +1,3 @@
 (library
  (name render_command)
- (libraries
-  base
-  bimage
-  bimage-io
-  domainslib
-  path_tracer
-  progress
-  stdio
-  time_now))
+ (libraries base bimage bimage-unix path_tracer progress stdio time_now))

@@ -1,10 +1,14 @@
-#![no_std]
+//#![no_std]
+
+#[cfg(target_arch = "x86_64")]
+use core::arch::x86_64::*;
+
 use ocaml_sys::Value;
 
-#[panic_handler]
-fn panic(_panic: &core::panic::PanicInfo<'_>) -> ! {
-    loop {}
-}
+//#[panic_handler]
+//fn panic(_panic: &core::panic::PanicInfo<'_>) -> ! {
+//    loop {}
+//}
 
 const LEAF_SIZE: usize = 16;
 
@@ -67,7 +71,7 @@ pub extern "C" fn spheres_intersect_native(
         let d = V3::from(make_slice(ray[1]));
         let (t_found, found) = spheres_intersect_aux(xs, ys, zs, rs, o, d, t_min, t_max);
         *(t_hit_ref as *mut f64) = t_found;
-        ocaml_sys::val_int(found)
+        ocaml_sys::val_int(found as isize)
     }
 }
 
@@ -168,6 +172,70 @@ unsafe fn spheres_intersect_aux(
         if t_hit <= t_found {
             t_found = t_hit;
             found = i as isize
+        }
+    }
+    (t_found, found)
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+fn spheres_intersect_aux(
+    xs: &[f64],
+    ys: &[f64],
+    zs: &[f64],
+    rs: &[f64],
+    o: V3,
+    d: V3,
+    t_min: f64,
+    t_max: f64,
+) -> (f64, i16) {
+    let mut t_hits = [f64::NAN; LEAF_SIZE];
+    let d_quadrance = d.quadrance();
+    let a = d_quadrance;
+    let one_over_a = 1.0 / a;
+    let ox = o.x;
+    let oy = o.y;
+    let oz = o.z;
+    let dx = d.x;
+    let dy = d.y;
+    let dz = d.z;
+    for ((((x, y), z), r), dst_t_hit) in xs.iter().zip(ys).zip(zs).zip(rs).zip(t_hits.iter_mut()) {
+        // f = center - origin
+        let fx = x - ox;
+        let fy = y - oy;
+        let fz = z - oz;
+        let r2 = r * r;
+        let c = fx.mul_add(fx, fy.mul_add(fy, fz * fz)) - r2;
+        // bp = dot(f, d)
+        let bp = fx.mul_add(dx, fy.mul_add(dy, fz * dz));
+        let bp_over_a = bp * one_over_a;
+        // let w = d.scale(bp / a) - f
+        let wx = dx.mul_add(bp_over_a, -fx);
+        let wy = dy.mul_add(bp_over_a, -fy);
+        let wz = dz.mul_add(bp_over_a, -fz);
+        let wq = wx.mul_add(wx, wy.mul_add(wy, wz * wz));
+        let discriminant = r2 - wq;
+        if discriminant.is_sign_positive() {
+            // let q = bp + (sign_bp * (a * discrim).sqrt());
+            let q_rhs = (a * discriminant).sqrt();
+            let q = bp + (bp.signum() * q_rhs);
+            let c_div_q = c / q;
+            let q_div_a = q * one_over_a;
+            let t_hit = if c.is_sign_positive() {
+                c_div_q
+            } else {
+                q_div_a
+            };
+            if t_min <= t_hit && t_hit <= t_max {
+                *dst_t_hit = t_hit
+            }
+        }
+    }
+    let mut t_found = t_max;
+    let mut found: i16 = -1;
+    for (i, &t_hit) in t_hits.iter().enumerate().take(xs.len()) {
+        if t_hit <= t_found {
+            t_found = t_hit;
+            found = i as i16
         }
     }
     (t_found, found)

@@ -235,17 +235,10 @@ let main argv =
   end
   in
   let module Ppm = Ppm.Make (Scene) in
-  let num_additional_domains = 7 in
-  let pool = Domainslib.Task.setup_pool ~num_additional_domains in
   let start = Time_now.nanoseconds_since_unix_epoch () in
-  let output =
-    match Bimage_io.Output.create argv.Args.output with
-    | Ok t -> t
-    | Error _ -> failwith "cannot create output"
-  in
-  let () = Ppm.go pool output in
+  let output = argv.Args.output in
+  let () = Ppm.go ~output in
   let elapsed_ns = Int63.O.(Time_now.nanoseconds_since_unix_epoch () - start) in
-  Domainslib.Task.teardown_pool pool;
   Stdio.printf "render time = %.3f ms\n" (1e-6 *. Float.of_int63 elapsed_ns)
 ;;
 

@@ -20,5 +20,5 @@ module Make (Scene : sig
   val intersect : Path_tracer.Ray.t -> Path_tracer.Hit.t option
   val background : Path_tracer.Ray.t -> Path_tracer.Color.t
 end) : sig
-  val run : ?pool:Domainslib.Task.pool -> Args.t -> unit
+  val run : Args.t -> unit
 end

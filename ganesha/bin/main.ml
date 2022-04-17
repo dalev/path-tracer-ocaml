@@ -182,8 +182,7 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
   in
   printf "dim = %d x %d;\n" width height;
   printf "#triangles = %d\n%!" (List.length triangles);
-  let pool = Domainslib.Task.setup_pool ~num_additional_domains:7 in
-  let elapsed, tree = with_elapsed_time (fun () -> Triangles.create ~pool triangles) in
+  let elapsed, tree = with_elapsed_time (fun () -> Triangles.create triangles) in
   printf
     "tree depth = %d\nbuild time = %.3f ms\nreachable words = %d\n%!"
     (Triangles.depth tree)
@@ -294,14 +293,8 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
       ;;
     end)
   in
-  let output =
-    match Bimage_io.Output.create output with
-    | Ok t -> t
-    | Error _ -> failwith "cannot create output"
-  in
-  let elapsed_ns, () = with_elapsed_time (fun () -> Ppm.go pool output) in
-  printf "elapsed ms: %.3f\n" @@ (Float.of_int63 elapsed_ns *. 1e-6);
-  Domainslib.Task.teardown_pool pool
+  let elapsed_ns, () = with_elapsed_time (fun () -> Ppm.go ~output) in
+  printf "elapsed ms: %.3f\n" @@ (Float.of_int63 elapsed_ns *. 1e-6)
 ;;
 
 let () = main (Args.parse ())

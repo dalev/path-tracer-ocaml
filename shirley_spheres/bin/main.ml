@@ -249,13 +249,12 @@ let main { Args.common; no_simd } =
   in
   printf "dim = %d x %d;\n" width height;
   printf "#spheres = %d\n" (List.length spheres);
-  let pool = Domainslib.Task.setup_pool ~num_additional_domains:7 in
   let camera = camera (width // height) in
   let elapsed, tree =
     let spheres =
       List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
     in
-    Render_command.with_elapsed_time (fun () -> Spheres.create ~pool spheres)
+    Render_command.with_elapsed_time (fun () -> Spheres.create spheres)
   in
   printf "tree depth = %d\n" (Spheres.depth tree);
   printf "build time = %.3f ms\n" (Float.of_int63 elapsed *. 1e-6);
@@ -274,8 +273,7 @@ let main { Args.common; no_simd } =
       ;;
     end)
   in
-  Render_cmd.run ~pool common;
-  Domainslib.Task.teardown_pool pool
+  Render_cmd.run common
 ;;
 
 let () = main (Args.parse ())

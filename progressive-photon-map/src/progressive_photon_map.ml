@@ -2,7 +2,6 @@ open Base
 open Path_tracer
 open Stdio
 module L = Low_discrepancy_sequence.Simple
-module Task = Domainslib.Task
 
 module Args = struct
   type t =
@@ -169,8 +168,7 @@ module Photon_map : sig
   val length : t -> int
 
   val create
-    :  Task.pool
-    -> sampler
+    :  sampler
     -> scene_intersect:(Ray.t -> Hit.t option)
     -> radius:float
     -> photon_count:int
@@ -258,35 +256,24 @@ end = struct
     !photons
   ;;
 
-  let create pool sampler ~scene_intersect ~radius ~photon_count ~max_bounces ~lights =
-    let module Chan = Domainslib.Chan in
-    let c = Chan.make_unbounded () in
-    let collector =
-      Caml.Domain.spawn (fun () ->
-          let rec loop photons =
-            match Chan.recv c with
-            | Some ps -> loop @@ List.rev_append ps photons
-            | None -> photons
-          in
-          loop [])
-    in
+  let create sampler ~scene_intersect ~radius ~photon_count ~max_bounces ~lights =
     let total_power = List.sum (module Float) lights ~f:Light.power in
     let offset = ref 0 in
+    let photons = ref [] in
     List.iter lights ~f:(fun light ->
         let f = Light.power light /. total_power in
         let photon_count = Int.of_float @@ (Float.of_int photon_count *. f) in
         let start = !offset in
         let finish = start + photon_count - 1 in
         offset := finish + 1;
-        Task.parallel_for pool ~start ~finish ~body:(fun i ->
-            let s ~dimension = sampler ~offset:i ~dimension in
-            Chan.send c @@ Some (trace_photon light s max_bounces scene_intersect ~radius)));
-    Chan.send c None;
-    let photons = Caml.Domain.join collector in
-    let length = List.length photons in
+        for i = !offset to start + photon_count - 1 do
+          let s ~dimension = sampler ~offset:i ~dimension in
+          photons := trace_photon light s max_bounces scene_intersect ~radius @ !photons
+        done);
+    let length = List.length !photons in
     if length = 0 then failwith "BUG: no photons";
     let num_bins = 8 in
-    { tree = Tree.create ~pool ~num_bins photons; length }
+    { tree = Tree.create ~num_bins !photons; length }
   ;;
 end
 
@@ -315,7 +302,7 @@ struct
 
   let create_blank_image () = Bimage.Image.v Bimage.Type.f64 Bimage.Color.rgb width height
 
-  let render_image img pool sampler pmap =
+  let render_image img sampler pmap =
     let module Image = Bimage.Image in
     let module Pixel = Bimage.Pixel in
     let write_pixel ~x ~y color =
@@ -390,18 +377,14 @@ struct
       let dimension = 2 in
       loop (Camera.ray camera cx cy) Color.white max_bounces dimension
     in
-    Task.parallel_for
-      ~chunk_size:(32 * 32)
-      pool
-      ~start:0
-      ~finish:((width * height) - 1)
-      ~body:(fun pixel ->
-        let x = pixel % width
-        and y = pixel / width in
-        let sampler ~dimension = sampler ~offset:pixel ~dimension in
-        let color' = estimate_color ~x ~y sampler in
-        let color = Color.scale color' inv_photon_count in
-        write_pixel ~x ~y color)
+    for pixel = 0 to (width * height) - 1 do
+      let x = pixel % width
+      and y = pixel / width in
+      let sampler ~dimension = sampler ~offset:pixel ~dimension in
+      let color' = estimate_color ~x ~y sampler in
+      let color = Color.scale color' inv_photon_count in
+      write_pixel ~x ~y color
+    done
   ;;
 
   let radius2 i =
@@ -420,31 +403,21 @@ struct
     L.get s ~offset:(offset + base) ~dimension
   ;;
 
-  let save_mtx = Caml.Mutex.create ()
-
-  let save_image pool bimg_output ~img_avg ~img_sum n =
+  let save_image output ~img_avg ~img_sum n =
     let one_over_n = 1 // n in
     let sum_data = img_sum.Bimage.Image.data in
     let avg_data = img_avg.Bimage.Image.data in
     let gamma x = x **. (1.0 /. 2.2) in
-    Caml.Mutex.lock save_mtx;
-    Exn.protect
-      ~f:(fun () ->
-        Task.parallel_for
-          pool
-          ~start:0
-          ~finish:((3 * width * height) - 1)
-          ~body:(fun i ->
-            let f = Bigarray.Array1.get sum_data i in
-            Bigarray.Array1.set avg_data i (gamma (f *. one_over_n)));
-        match Bimage_io.Output.write ~append:false bimg_output img_avg with
-        | Ok () -> ()
-        | Error (`File_not_found s) -> failwith @@ "file not found: " ^ s
-        | Error (#Bimage.Error.t as e) -> Bimage.Error.exc e)
-      ~finally:(fun () -> Caml.Mutex.unlock save_mtx)
+    for i = 0 to (3 * width * height) - 1 do
+      let f = Bigarray.Array1.get sum_data i in
+      Bigarray.Array1.set avg_data i (gamma (f *. one_over_n))
+    done;
+    match Bimage_unix.Stb.write output img_avg with
+    | Ok () -> ()
+    | Error (#Bimage.Error.t as e) -> Bimage.Error.exc e
   ;;
 
-  let go pool bimg_output =
+  let go ~output =
     printf "#max-bounces = %d\n" max_bounces;
     printf "#photons/iter = %d\n" photon_count;
     printf "#iterations = %d\n" iterations;
@@ -462,7 +435,6 @@ struct
       printf "#iteration = %d, radius = %.3f\n%!" i radius;
       let pmap =
         Photon_map.create
-          pool
           (offset_sampler p_sampler (i * photon_count))
           ~scene_intersect:Scene.intersect
           ~photon_count
@@ -472,9 +444,9 @@ struct
       in
       printf "  photon map length = %d\n%!" (Photon_map.length pmap);
       let eye_sample_base = i * width * height in
-      render_image img_sum pool (offset_sampler e_sampler eye_sample_base) pmap;
+      render_image img_sum (offset_sampler e_sampler eye_sample_base) pmap;
       let n = i + 1 in
-      save_image pool bimg_output ~img_avg ~img_sum n
+      save_image output ~img_avg ~img_sum n
     done
   ;;
 end

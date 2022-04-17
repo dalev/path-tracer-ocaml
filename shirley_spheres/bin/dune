@@ -22,7 +22,7 @@
      %{project_root}/sphere-intersect-rs
      (setenv
       RUSTFLAGS
-      "-C target-cpu=native"
+      "-C target-cpu=native -C link-args=-Wl,-undefined,dynamic_lookup"
       (run cargo build --release)))
     (copy
      %{project_root}/sphere-intersect-rs/target/release/libsphere_intersect.a
