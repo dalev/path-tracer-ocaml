@@ -14,27 +14,27 @@
  (synopsis "library for the geometry-agnostic portion")
  (depends
   (time_now
-   (>= v0.14.0))
+   (>= v0.15.0))
   (core
-   (>= v0.14.1))
+   (>= v0.15.0))
   (stdio
-   (>= v0.14.0))
+   (>= v0.15.0))
   (progress
    (>= 0.2.1))
   (ppx_base
-   (>= v0.14.0))
-  (bimage-io
-   (>= 0.4.0))
+   (>= v0.15.0))
+  (bimage-unix
+   (>= 0.5.0))
   (bimage
-   (>= 0.4.0))
+   (>= 0.5.0))
   (alcotest
    (and
     :with-test
-    (>= "1.4")))
+    (>= 1.5)))
   (base
-   (>= 0.14.1))
+   (>= 0.15.0))
   (ocaml
-   (>= 4.12))))
+   (>= 4.14))))
 
 (package
  (name low_discrepancy_sequence)
@@ -43,9 +43,9 @@
   (alcotest
    (and
     :with-test
-    (>= "1.4")))
+    (>= 1.5)))
   (ocaml
-   (>= 4.12))))
+   (>= 4.14))))
 
 (package
  (name ply_format)
@@ -53,23 +53,23 @@
  (depends
   (alcotest
    (and
-    (>= 1.4.0)
+    (>= 1.5.0)
     :with-test))
   (core_kernel
-   (>= v0.14.1))
+   (>= v0.15.0))
   (ppx_sexp_message
-   (>= v0.14.1))
+   (>= v0.15.0))
   (ppx_base
-   (>= v0.14.0))
+   (>= v0.15.0))
   (parsexp
-   (>= v0.14.1))
+   (>= v0.15.0))
   (bigstringaf
-   (>= 0.8.0))
+   (>= 0.9.0))
   (base_bigstring
-   (>= v0.14.0))
+   (>= v0.15.0))
   (base
-   (>= v0.14.1))
+   (>= v0.15.0))
   (ocaml
-   (>= 4.12))))
+   (>= 4.14))))
 
 (generate_opam_files true)
