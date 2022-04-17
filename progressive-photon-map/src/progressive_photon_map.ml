@@ -266,7 +266,7 @@ end = struct
         let start = !offset in
         let finish = start + photon_count - 1 in
         offset := finish + 1;
-        for i = !offset to start + photon_count - 1 do
+        for i = start to start + photon_count - 1 do
           let s ~dimension = sampler ~offset:i ~dimension in
           photons := trace_photon light s max_bounces scene_intersect ~radius @ !photons
         done);
