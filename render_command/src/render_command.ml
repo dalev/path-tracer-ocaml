@@ -3,9 +3,6 @@ open Stdio
 open Path_tracer
 module Image = Bimage.Image
 
-let color_space = Bimage.rgb
-let mkImage width height = Image.v Bimage.f64 color_space width height
-
 module Args = struct
   type t =
     { width : int
@@ -59,6 +56,48 @@ let with_elapsed_time f =
   elapsed, x
 ;;
 
+module Film : sig
+  type t
+
+  val create : width:int -> height:int -> output:string -> samples_per_pixel:int -> t
+  val save_exn : t -> unit
+  val write_pixel : t -> x:int -> y:int -> Color.t -> unit
+end = struct
+  type t =
+    { raw_img : [ `Rgb ] Bimage.image_f64
+    ; output : string
+    ; samples_per_pixel : int
+    }
+
+  let color_space = Bimage.rgb
+  let mkImage width height = Image.v Bimage.f64 color_space width height
+
+  let create ~width ~height ~output ~samples_per_pixel =
+    let raw_img = mkImage width height in
+    { raw_img; output; samples_per_pixel }
+  ;;
+
+  let write_pixel t ~x ~y color =
+    let incr ch v =
+      let a = Image.get t.raw_img x y ch in
+      Image.set t.raw_img x y ch (a +. v)
+    in
+    let r, g, b = Color.to_rgb color in
+    incr 0 r;
+    incr 1 g;
+    incr 2 b
+  ;;
+
+  let save_exn t =
+    let spp_inv = 1 // t.samples_per_pixel in
+    let gamma f = Float.sqrt (f *. spp_inv) in
+    let gamma_encoded_img = Bimage.Image.map_inplace gamma t.raw_img in
+    match Bimage_unix.Stb.write t.output gamma_encoded_img with
+    | Ok () -> ()
+    | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other)
+  ;;
+end
+
 module Make (Scene : sig
   val camera : Camera.t
   val intersect : Ray.t -> Hit.t option
@@ -66,13 +105,8 @@ module Make (Scene : sig
 end) =
 struct
   let run { Args.width; height; max_bounces; samples_per_pixel; no_progress; output } =
-    let img = mkImage width height in
-    let write_pixel ~x ~y color =
-      let r, g, b = Color.to_rgb color in
-      Image.set img x y 0 r;
-      Image.set img x y 1 g;
-      Image.set img x y 2 b
-    in
+    let film = Film.create ~width ~height ~output ~samples_per_pixel in
+    let write_pixel = Film.write_pixel film in
     let i =
       Integrator.create
         ~width
@@ -103,17 +137,14 @@ struct
                    ]
                in
                let config =
-                 Progress.Config.v ~min_interval:(Some Progress.Duration.second) ()
+                 let min_interval = Some (Progress.Duration.of_sec 0.2) in
+                 Progress.Config.v ~min_interval ()
                in
                Progress.with_reporter ~config p (fun report ->
                    let update_progress () = report 1 in
                    Integrator.render i ~update_progress)))
     in
-    let () =
-      match Bimage_unix.Stb.write output img with
-      | Ok () -> ()
-      | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other)
-    in
+    Film.save_exn film;
     printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6)
   ;;
 end

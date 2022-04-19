@@ -89,17 +89,13 @@ let create
   { width; height; write_pixel; samples_per_pixel; max_bounces; trace_path; tiles }
 ;;
 
-let gamma = Color.map ~f:Float.sqrt
-
 let render_tile t tile tile_sampler =
   let widthf = 1 // t.width in
   let heightf = 1 // t.height in
-  let spp_invf = 1 // t.samples_per_pixel in
   let sampler = ref tile_sampler in
   Tile.iter tile ~f:(fun ~x ~y ->
       let yf = Float.of_int (t.height - 1 - y) in
       let xf = Float.of_int x in
-      let color = ref Color.black in
       for _ = 1 to t.samples_per_pixel do
         let sampler', s = L.step !sampler in
         sampler := sampler';
@@ -108,9 +104,9 @@ let render_tile t tile tile_sampler =
         and dy = s.%{1} in
         let cx = (xf +. dx) *. widthf in
         let cy = (yf +. dy) *. heightf in
-        color := Color.Infix.( + ) !color @@ t.trace_path ~cx ~cy t.max_bounces s
-      done;
-      t.write_pixel ~x ~y @@ gamma (Color.scale !color spp_invf))
+        let color = t.trace_path ~cx ~cy t.max_bounces s in
+        t.write_pixel ~x ~y color
+      done)
 ;;
 
 let create_tile_samplers t tiles =
