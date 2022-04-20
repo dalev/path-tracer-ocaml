@@ -38,6 +38,23 @@ let split t ~max_area =
 
 let create ~width ~height = { row = 0; col = 0; width; height }
 
+let extend t ~radius =
+  assert (radius > 0);
+  { row = t.row - radius
+  ; col = t.col - radius
+  ; width = t.width + radius
+  ; height = t.height + radius
+  }
+;;
+
+let iter_local t ~f =
+  for y = 0 to t.height - 1 do
+    for x = 0 to t.width - 1 do
+      f ~x ~y
+    done
+  done
+;;
+
 let iter t ~f =
   let x0 = t.col in
   let y0 = t.row in

@@ -1,0 +1,3 @@
+(library
+ (name filter_kernel)
+ (libraries base fmt num))

@@ -77,6 +77,8 @@ end = struct
     { raw_img; output; samples_per_pixel }
   ;;
 
+  (* let new_tile_buffer t tile = mkImage t.Tile.width t.Tile.height *)
+
   let write_pixel t ~x ~y color =
     let incr ch v =
       let a = Image.get t.raw_img x y ch in
