@@ -1,17 +1,32 @@
 open! Base
 module FArray = Caml.Float.ArrayLabels
 
+let ( .%{} ) = FArray.get
+
+type t =
+  { dim : int
+  ; pixel_radius : int
+  ; data : FArray.t
+  }
+
+let iter t ~f =
+  let r = t.pixel_radius in
+  let i = ref 0 in
+  for dy = -r to r do
+    for dx = -r to r do
+      let weight = t.data.%{!i} in
+      Int.incr i;
+      f ~dx ~dy weight
+    done
+  done
+;;
+
 module Binomial = struct
   let rec pow_falling n k = if k = 0 then 1 else n * pow_falling (n - 1) (k - 1)
   let factorial n = pow_falling n n
   let binomial n k = pow_falling n k / factorial k
 
-  type t =
-    { dim : int
-    ; data : FArray.t
-    }
-
-  let pp f { dim; data } =
+  let pp f { dim; pixel_radius = _; data } =
     let fmt_row =
       Fmt.append (Fmt.hbox @@ Fmt.brackets @@ Fmt.list ~sep:Fmt.sp Fmt.float) Fmt.cut
     in
@@ -23,7 +38,6 @@ module Binomial = struct
   let outer_product v w =
     let order = FArray.length v in
     assert (order = FArray.length w);
-    let ( .%{} ) = FArray.get in
     FArray.init (order * order) ~f:(fun j ->
         let r = j / order
         and c = j % order in
@@ -65,6 +79,6 @@ module Binomial = struct
     in
     let total_weight = FArray.fold_left ~f:( +. ) ~init:0.0 w in
     let w = FArray.map ~f:(fun f -> f /. total_weight) w in
-    { dim = f_width; data = outer_product w w }
+    { dim = f_width; pixel_radius; data = outer_product w w }
   ;;
 end

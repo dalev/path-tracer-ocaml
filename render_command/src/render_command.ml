@@ -67,27 +67,39 @@ end = struct
     { raw_img : [ `Rgb ] Bimage.image_f64
     ; output : string
     ; samples_per_pixel : int
+    ; filter_kernel : Filter_kernel.t
     }
 
   let color_space = Bimage.rgb
   let mkImage width height = Image.v Bimage.f64 color_space width height
+  let pixel_radius = 1
 
   let create ~width ~height ~output ~samples_per_pixel =
     let raw_img = mkImage width height in
-    { raw_img; output; samples_per_pixel }
+    let filter_kernel = Filter_kernel.Binomial.create ~order:5 ~pixel_radius in
+    { raw_img; output; samples_per_pixel; filter_kernel }
   ;;
 
   (* let new_tile_buffer t tile = mkImage t.Tile.width t.Tile.height *)
 
   let write_pixel t ~x ~y color =
-    let incr ch v =
-      let a = Image.get t.raw_img x y ch in
-      Image.set t.raw_img x y ch (a +. v)
+    let in_bounds x y =
+      0 <= x && x < t.raw_img.Image.width && 0 <= y && y < t.raw_img.Image.height
     in
-    let r, g, b = Color.to_rgb color in
-    incr 0 r;
-    incr 1 g;
-    incr 2 b
+    Filter_kernel.iter t.filter_kernel ~f:(fun ~dx ~dy weight ->
+        let x = x + dx
+        and y = y + dy in
+        if in_bounds x y
+        then (
+          let incr ch v =
+            let v = v *. weight in
+            let a = Image.get t.raw_img x y ch in
+            Image.set t.raw_img x y ch (a +. v)
+          in
+          let r, g, b = Color.to_rgb color in
+          incr 0 r;
+          incr 1 g;
+          incr 2 b))
   ;;
 
   let save_exn t =
