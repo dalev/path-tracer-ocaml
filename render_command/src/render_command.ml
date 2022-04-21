@@ -38,7 +38,7 @@ module Args = struct
     in
     let max_bounces =
       let doc = "max ray bounces" in
-      Arg.(value & opt int 4 & info [ "max-ray-bounces" ] ~docs ~doc ~docv:"INT")
+      Arg.(value & opt int 8 & info [ "max-ray-bounces" ] ~docs ~doc ~docv:"INT")
     in
     let mk (width, height) samples_per_pixel output no_progress max_bounces =
       { width; height; samples_per_pixel; output; no_progress; max_bounces }
