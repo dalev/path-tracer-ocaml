@@ -9,14 +9,17 @@ module Args = struct
     ; no_simd : bool
     }
 
-  let parse () =
-    let no_simd = ref false in
-    let common =
-      Common_args.parse
-        ~specs:[ "-no-simd", Set no_simd, "do not use SIMD accelerated intersection" ]
-        ()
+  let term =
+    let open Cmdliner in
+    let docs = Manpage.s_options in
+    let no_simd =
+      let doc =
+        "use plain ocaml sphere intersection instead of FFI call to rust implementation"
+      in
+      Arg.(value & flag & info [ "no-simd" ] ~docs ~doc)
     in
-    { common; no_simd = !no_simd }
+    let mk common no_simd = { common; no_simd } in
+    Term.(const mk $ Common_args.term $ no_simd)
   ;;
 end
 
@@ -276,4 +279,13 @@ let main { Args.common; no_simd } =
   Render_cmd.run common
 ;;
 
-let () = main (Args.parse ())
+let main_cmd =
+  let open Cmdliner in
+  let man = [ `S Manpage.s_description; `P "Render some spheres." ] in
+  let sdocs = Manpage.s_common_options in
+  let doc = "render Shirley spheres" in
+  let info = Cmd.info "shirley_spheres" ~doc ~sdocs ~man in
+  Cmd.v info Term.(const main $ Args.term)
+;;
+
+let () = Caml.exit @@ Cmdliner.Cmd.eval main_cmd

@@ -13,38 +13,45 @@ module Args = struct
     ; max_bounces : int
     }
 
-  let parse ?(specs = []) () =
-    let width = ref 600 in
-    let height = ref !width in
-    let spp = ref 1 in
-    let file = ref "output.png" in
-    let no_progress = ref false in
-    let max_bounces = ref 4 in
-    let usage_msg =
-      Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width !height !file
+  let term =
+    let open Cmdliner in
+    let docs = Manpage.s_options in
+    let dimension =
+      let doc = "image dimensions" in
+      Arg.(
+        required
+        & opt (some (pair int int)) None
+        & info [ "d"; "dimension" ] ~docs ~doc ~docv:"WIDTH,HEIGHT")
     in
-    let specs =
-      specs
-      @ Caml.Arg.
-          [ "-width", Set_int width, "<integer> image width"
-          ; "-height", Set_int height, "<integer> image height"
-          ; "-samples-per-pixel", Set_int spp, "<integer> samples-per-pixel"
-          ; "-o", Set_string file, "<file> output file"
-          ; "-no-progress", Set no_progress, "suppress progress monitor"
-          ; "-max-bounces", Set_int max_bounces, "<integer> max ray bounces"
-          ]
+    let output =
+      let doc = "write image to $(docv)" in
+      Arg.(
+        required
+        & opt (some file) (Some "output.png")
+        & info [ "o"; "output" ] ~docs ~doc ~docv:"PATH")
     in
-    Caml.Arg.parse
-      specs
-      (fun (_ : string) -> failwith "No anonymous arguments expected")
-      usage_msg;
-    { width = !width
-    ; height = !height
-    ; samples_per_pixel = !spp
-    ; output = !file
-    ; no_progress = !no_progress
-    ; max_bounces = !max_bounces
-    }
+    let spp =
+      let doc = "trace $(docv) camera rays per pixel" in
+      Arg.(
+        required
+        & opt (some int) (Some 1)
+        & info [ "samples-per-pixel" ] ~docs ~doc ~docv:"INT")
+    in
+    let no_progress =
+      let doc = "suppress progress bar" in
+      Arg.(value & flag & info [ "no-progress" ] ~docs ~doc)
+    in
+    let max_bounces =
+      let doc = "max ray bounces" in
+      Arg.(
+        required
+        & opt (some int) (Some 4)
+        & info [ "max-ray-bounces" ] ~docs ~doc ~docv:"INT")
+    in
+    let mk (width, height) samples_per_pixel output no_progress max_bounces =
+      { width; height; samples_per_pixel; output; no_progress; max_bounces }
+    in
+    Term.(const mk $ dimension $ spp $ output $ no_progress $ max_bounces)
   ;;
 end
 
@@ -156,6 +163,8 @@ struct
                    Integrator.render i ~update_progress)))
     in
     Film.save_exn film;
-    printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6)
+    printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6);
+    let argv = Sys.get_argv () in
+    Fmt.(array ~sep:sp string ++ cut) Fmt.stdout argv
   ;;
 end

@@ -4,7 +4,7 @@
  (name main)
  (preprocess
   (pps ppx_base))
- (libraries base path_tracer render_command sphere stdio)
+ (libraries base cmdliner path_tracer render_command sphere stdio)
  (foreign_archives sphere_intersect))
 
 (rule

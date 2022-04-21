@@ -10,7 +10,7 @@ module Args : sig
     ; max_bounces : int
     }
 
-  val parse : ?specs:(string * Caml.Arg.spec * string) list -> unit -> t
+  val term : t Cmdliner.Term.t
 end
 
 val with_elapsed_time : (unit -> 'a) -> Int63.t * 'a
