@@ -90,9 +90,8 @@ end = struct
         if in_bounds x y
         then (
           let incr ch v =
-            let v = v *. weight in
             let a = Image.get t.raw_img x y ch in
-            Image.set t.raw_img x y ch (a +. v)
+            Image.set t.raw_img x y ch (Caml.Float.fma weight v a)
           in
           let r, g, b = Color.to_rgb color in
           incr 0 r;

@@ -36,6 +36,7 @@ module V3 = struct
 
   let[@inline] map { x; y; z } ~f = { x = f x; y = f y; z = f z }
   let[@inline] map2 a b ~f = { x = f a.x b.x; y = f a.y b.y; z = f a.z b.z }
+  let[@inline] map3 a b c ~f = { x = f a.x b.x c.x; y = f a.y b.y c.y; z = f a.z b.z c.z }
   let of_float a = { x = a; y = a; z = a }
   let zero = of_float 0.0
   let one = of_float 1.0
@@ -49,6 +50,7 @@ module V3 = struct
   end
 
   let of_points ~src ~tgt = Infix.( - ) tgt src
+  let[@inline] fma u v w = map3 ~f:Caml.Float.fma u v w
 
   (* These two inlines are to avoid alloc in Bbox.is_hit *)
   let[@inline] min_coord { x; y; z } = Float.min x (Float.min y z)

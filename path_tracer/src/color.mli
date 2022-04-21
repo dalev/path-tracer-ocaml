@@ -13,6 +13,7 @@ val scale : t -> float -> t
 val map : t -> f:(float -> float) -> t
 val lerp : float -> t -> t -> t
 val max_coord : t -> float
+val fma : t -> t -> t -> t
 
 module Infix : sig
   val ( + ) : t -> t -> t
@@ -20,5 +21,4 @@ module Infix : sig
   val ( * ) : t -> t -> t
 end
 
-val ( + ) : t -> t -> t
 val zero : t

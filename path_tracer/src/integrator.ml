@@ -26,7 +26,7 @@ let path_tracer ~intersect ~background ~diffuse_plus_light ~camera =
       samples_index := j + 2;
       u, v
   in
-  let add_mul a b c = Color.Infix.(a + (b * c)) in
+  let add_mul a b c = Color.fma b c a in
   let rec loop ray max_bounces emit0 attn0 =
     if max_bounces <= 0
     then add_mul emit0 attn0 Color.black
@@ -90,18 +90,13 @@ let create
 let render_tile t tile lds =
   let widthf = 1 // t.width in
   let heightf = 1 // t.height in
-  let offset =
-    ref @@ (t.samples_per_pixel * ((tile.Tile.row * t.width) + tile.Tile.col))
-  in
   Tile.iter tile ~f:(fun ~x ~y ->
+      let offset = t.samples_per_pixel * ((y * t.height) + x) in
       let yf = Float.of_int (t.height - 1 - y) in
       let xf = Float.of_int x in
-      for _ = 1 to t.samples_per_pixel do
-        let sample =
-          let offset = !offset in
-          fun ~dimension -> L.get lds ~offset ~dimension
-        in
-        Int.incr offset;
+      for j = 0 to t.samples_per_pixel - 1 do
+        let offset = offset + j in
+        let sample ~dimension = L.get lds ~offset ~dimension in
         let dx = sample ~dimension:0
         and dy = sample ~dimension:1 in
         let cx = (xf +. dx) *. widthf in
