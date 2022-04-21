@@ -64,9 +64,11 @@ module Mesh = struct
     let flds = "x", "y", "z" in
     let xyzs' = map3 flds ~f in
     let lengths = map3 xyzs' ~f:FArray.length in
-    (let lx, ly, lz = lengths in
-     assert (lx = ly);
-     assert (ly = lz));
+    begin
+      let lx, ly, lz = lengths in
+      assert (lx = ly);
+      assert (ly = lz)
+    end;
     let xs, ys, zs = map3 lengths ~f:FArray.create in
     let p3 (x, y, z) = P3.create ~x ~y ~z in
     for i = 0 to fst3 lengths - 1 do
