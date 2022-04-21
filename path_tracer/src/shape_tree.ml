@@ -184,7 +184,7 @@ module Make (L : Leaf) = struct
     ;;
 
     let create ~num_bins bbox shapes =
-      let rec loop bbox shapes ~depth =
+      let rec loop bbox shapes =
         if Slice.length shapes <= L.length_cutoff
         then make_leaf bbox shapes
         else (
@@ -198,14 +198,12 @@ module Make (L : Leaf) = struct
             else (
               let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
               let axis = V3.axis @@ Proposal.axis p in
-              let rhs_box = Proposal.rhs_box p in
-              let depth = Int.O.(depth + 1) in
-              let do_rhs () = loop rhs_box r ~depth in
-              let lhs = loop (Proposal.lhs_box p) l ~depth in
-              let rhs = do_rhs () in
+              let lhs_box, rhs_box = Proposal.lhs_box p, Proposal.rhs_box p in
+              let lhs = loop lhs_box l in
+              let rhs = loop rhs_box r in
               Branch { lhs; rhs; bbox; axis }))
       in
-      loop bbox shapes ~depth:0
+      loop bbox shapes
     ;;
 
     let intersect t ray ~t_min ~t_max =

@@ -107,7 +107,10 @@ struct
 
     let[@inline] vertices t = point t.a, point t.b, point t.c
     let tex_coords _ = Texture.Coord.(t00, t01, t11)
-    let material _ = Material.glass
+
+    let material _ =
+      Material.lambertian (Texture.solid (Color.create ~r:0.1 ~g:0.7 ~b:0.2))
+    ;;
   end
 
   include Triangle.Make (Face)
