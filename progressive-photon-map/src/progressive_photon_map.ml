@@ -1,7 +1,7 @@
 open Base
 open Path_tracer
 open Stdio
-module L = Low_discrepancy_sequence.Simple
+module L = Low_discrepancy_sequence
 
 module Args = struct
   type t =
@@ -422,11 +422,11 @@ struct
     printf "#photons/iter = %d\n" photon_count;
     printf "#iterations = %d\n" iterations;
     printf "-----\n%!";
-    let p_sampler = L.create ~dimensions:(2 + (2 * max_bounces)) in
+    let p_sampler = L.create ~dimension:(2 + (2 * max_bounces)) in
     let e_sampler =
       (* eye paths terminate at the first diffuse interaction, and so they only use
       one sample dimension per bounce. *)
-      L.create ~dimensions:(2 + max_bounces)
+      L.create ~dimension:(2 + max_bounces)
     in
     let img_sum = create_blank_image () in
     let img_avg = create_blank_image () in

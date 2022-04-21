@@ -80,8 +80,6 @@ end = struct
     { raw_img; output; samples_per_pixel; filter_kernel }
   ;;
 
-  (* let new_tile_buffer t tile = mkImage t.Tile.width t.Tile.height *)
-
   let write_pixel t ~x ~y color =
     let in_bounds x y =
       0 <= x && x < t.raw_img.Image.width && 0 <= y && y < t.raw_img.Image.height
