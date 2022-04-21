@@ -26,16 +26,11 @@ module Args = struct
     let output =
       let doc = "write image to $(docv)" in
       Arg.(
-        required
-        & opt (some file) (Some "output.png")
-        & info [ "o"; "output" ] ~docs ~doc ~docv:"PATH")
+        value & opt string "output.png" & info [ "o"; "output" ] ~docs ~doc ~docv:"PATH")
     in
     let spp =
       let doc = "trace $(docv) camera rays per pixel" in
-      Arg.(
-        required
-        & opt (some int) (Some 1)
-        & info [ "samples-per-pixel" ] ~docs ~doc ~docv:"INT")
+      Arg.(value & opt int 1 & info [ "samples-per-pixel" ] ~docs ~doc ~docv:"INT")
     in
     let no_progress =
       let doc = "suppress progress bar" in
@@ -43,10 +38,7 @@ module Args = struct
     in
     let max_bounces =
       let doc = "max ray bounces" in
-      Arg.(
-        required
-        & opt (some int) (Some 4)
-        & info [ "max-ray-bounces" ] ~docs ~doc ~docv:"INT")
+      Arg.(value & opt int 4 & info [ "max-ray-bounces" ] ~docs ~doc ~docv:"INT")
     in
     let mk (width, height) samples_per_pixel output no_progress max_bounces =
       { width; height; samples_per_pixel; output; no_progress; max_bounces }
@@ -163,8 +155,6 @@ struct
                    Integrator.render i ~update_progress)))
     in
     Film.save_exn film;
-    printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6);
-    let argv = Sys.get_argv () in
-    Fmt.(array ~sep:sp string ++ cut) Fmt.stdout argv
+    printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6)
   ;;
 end
