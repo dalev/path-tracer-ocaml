@@ -101,6 +101,7 @@ let render_tile t tile lds =
           let offset = !offset in
           fun ~dimension -> L.get lds ~offset ~dimension
         in
+        Int.incr offset;
         let dx = sample ~dimension:0
         and dy = sample ~dimension:1 in
         let cx = (xf +. dx) *. widthf in
