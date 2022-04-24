@@ -7,15 +7,12 @@ type t =
   ; write_pixel : x:int -> y:int -> Color.t -> unit
   ; samples_per_pixel : int
   ; max_bounces : int
-  ; trace_path : cx:float -> cy:float -> int -> sample:(dimension:int -> float) -> Color.t
-  ; tiles : Tile.t list
+  ; trace_path : cx:float -> cy:float -> sample:(dimension:int -> float) -> Color.t
   }
 
-let count_tiles t = List.length t.tiles
-
-let path_tracer ~intersect ~background ~diffuse_plus_light ~camera =
+let path_tracer ~intersect ~background ~diffuse_plus_light ~camera ~max_bounces =
   Staged.stage
-  @@ fun ~cx ~cy max_bounces ~sample ->
+  @@ fun ~cx ~cy ~sample ->
   let ray = Camera.ray camera cx cy in
   let take_2d =
     let samples_index = ref 2 in
@@ -80,37 +77,35 @@ let create
     ~diffuse_plus_light
   =
   let trace_path =
-    Staged.unstage @@ path_tracer ~intersect ~background ~diffuse_plus_light ~camera
+    Staged.unstage
+    @@ path_tracer ~intersect ~background ~diffuse_plus_light ~camera ~max_bounces
   in
-  let max_area = 32 * 32 in
-  let tiles = Tile.split ~max_area (Tile.create ~width ~height) in
-  { width; height; write_pixel; samples_per_pixel; max_bounces; trace_path; tiles }
-;;
-
-let render_tile t tile lds =
-  let widthf = 1 // t.width in
-  let heightf = 1 // t.height in
-  Tile.iter tile ~f:(fun ~x ~y ->
-      let offset = t.samples_per_pixel * ((y * t.height) + x) in
-      let yf = Float.of_int (t.height - 1 - y) in
-      let xf = Float.of_int x in
-      for j = 0 to t.samples_per_pixel - 1 do
-        let offset = offset + j in
-        let sample ~dimension = L.get lds ~offset ~dimension in
-        let dx = sample ~dimension:0
-        and dy = sample ~dimension:1 in
-        let cx = (xf +. dx) *. widthf in
-        let cy = (yf +. dy) *. heightf in
-        let color = t.trace_path ~cx ~cy t.max_bounces ~sample in
-        t.write_pixel ~x ~y color
-      done)
+  { width; height; write_pixel; samples_per_pixel; max_bounces; trace_path }
 ;;
 
 let create_sampler t = L.create ~dimension:(2 + (2 * t.max_bounces))
 
 let render ~update_progress t =
-  let s = create_sampler t in
-  List.iter t.tiles ~f:(fun tile ->
-      render_tile t tile s;
-      update_progress ())
+  let widthf = 1 // t.width in
+  let heightf = 1 // t.height in
+  let lds = create_sampler t in
+  for pass = 0 to t.samples_per_pixel - 1 do
+    let offset' = ref pass in
+    for y = 0 to t.height - 1 do
+      let yf = Float.of_int (t.height - 1 - y) in
+      for x = 0 to t.width - 1 do
+        let xf = Float.of_int x in
+        let offset = !offset' in
+        offset' := offset + t.samples_per_pixel;
+        let sample ~dimension = L.get lds ~offset ~dimension in
+        let dx = sample ~dimension:0
+        and dy = sample ~dimension:1 in
+        let cx = (xf +. dx) *. widthf in
+        let cy = (yf +. dy) *. heightf in
+        let color = t.trace_path ~cx ~cy ~sample in
+        t.write_pixel ~x ~y color
+      done;
+      update_progress t.width
+    done
+  done
 ;;

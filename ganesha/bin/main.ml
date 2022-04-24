@@ -108,9 +108,9 @@ struct
     ;;
 
     let[@inline] vertices t = point t.a, point t.b, point t.c
-    let tex_coords _ = Texture.Coord.(t00, t01, t11)
+    let tex_coords (_ : t) = Texture.Coord.(t00, t01, t11)
 
-    let material _ =
+    let material (_ : t) =
       Material.lambertian (Texture.solid (Color.create ~r:0.1 ~g:0.7 ~b:0.2))
     ;;
   end

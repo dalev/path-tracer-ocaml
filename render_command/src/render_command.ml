@@ -80,22 +80,19 @@ end = struct
   ;;
 
   let write_pixel t ~x ~y color =
-    let in_bounds x y =
-      0 <= x && x < t.raw_img.Image.width && 0 <= y && y < t.raw_img.Image.height
-    in
+    let width_minus_one = t.raw_img.Image.width - 1 in
+    let height_minus_one = t.raw_img.Image.height - 1 in
     Filter_kernel.iter t.filter_kernel ~f:(fun ~dx ~dy weight ->
-        let x = x + dx
-        and y = y + dy in
-        if in_bounds x y
-        then (
-          let incr ch v =
-            let a = Image.get t.raw_img x y ch in
-            Image.set t.raw_img x y ch (Caml.Float.fma weight v a)
-          in
-          let r, g, b = Color.to_rgb color in
-          incr 0 r;
-          incr 1 g;
-          incr 2 b))
+        let x = Int.clamp_exn (x + dx) ~min:0 ~max:width_minus_one
+        and y = Int.clamp_exn (y + dy) ~min:0 ~max:height_minus_one in
+        let incr ch v =
+          let a = Image.get t.raw_img x y ch in
+          Image.set t.raw_img x y ch (Caml.Float.fma weight v a)
+        in
+        let r, g, b = Color.to_rgb color in
+        incr 0 r;
+        incr 1 g;
+        incr 2 b)
   ;;
 
   let save_exn t =
@@ -129,31 +126,30 @@ struct
         ~camera:Scene.camera
         ~diffuse_plus_light:Pdf.diffuse
     in
-    let elapsed =
-      fst
-      @@ with_elapsed_time (fun () ->
-             if no_progress
-             then Integrator.render i ~update_progress:ignore
-             else (
-               let total = Integrator.count_tiles i in
-               let p =
-                 let open Progress.Line in
-                 list
-                   [ spinner ()
-                   ; elapsed ()
-                   ; bar ~style:`ASCII total
-                   ; count_to total
-                   ; spacer 4
-                   ]
-               in
-               let config =
-                 let min_interval = Some (Progress.Duration.of_sec 0.2) in
-                 Progress.Config.v ~min_interval ()
-               in
-               Progress.with_reporter ~config p (fun report ->
-                   let update_progress () = report 1 in
-                   Integrator.render i ~update_progress)))
+    let render () =
+      if no_progress
+      then Integrator.render i ~update_progress:ignore
+      else begin
+        let total = width * height * samples_per_pixel in
+        let p =
+          let open Progress.Line in
+          list
+            [ spinner ()
+            ; elapsed ()
+            ; bar ~style:`ASCII total
+            ; percentage_of total
+            ; spacer 4
+            ]
+        in
+        let config =
+          let min_interval = Some (Progress.Duration.of_sec 0.2) in
+          Progress.Config.v ~min_interval ()
+        in
+        Progress.with_reporter ~config p (fun report ->
+            Integrator.render i ~update_progress:report)
+      end
     in
+    let elapsed, () = with_elapsed_time render in
     Film.save_exn film;
     printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6)
   ;;
