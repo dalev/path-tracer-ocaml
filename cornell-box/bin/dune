@@ -13,7 +13,6 @@
   triangle
   ;; CR dalev: factor these out later:
   bimage
-  bimage-io
-  domainslib
+  bimage-unix
   progress
   time_now))

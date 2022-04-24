@@ -7,28 +7,23 @@ type t =
   ; write_pixel : x:int -> y:int -> Color.t -> unit
   ; samples_per_pixel : int
   ; max_bounces : int
-  ; trace_path :
-      cx:float -> cy:float -> int -> Low_discrepancy_sequence.Sample.t -> Color.t
-  ; tiles : Tile.t list
+  ; trace_path : cx:float -> cy:float -> sample:(dimension:int -> float) -> Color.t
   }
 
-let count_tiles t = List.length t.tiles
-
-let path_tracer ~intersect ~background ~diffuse_plus_light ~camera =
+let path_tracer ~intersect ~background ~diffuse_plus_light ~camera ~max_bounces =
   Staged.stage
-  @@ fun ~cx ~cy max_bounces samples ->
+  @@ fun ~cx ~cy ~sample ->
   let ray = Camera.ray camera cx cy in
   let take_2d =
-    let open L.Sample in
     let samples_index = ref 2 in
     fun () ->
       let j = !samples_index in
-      let u = samples.%{j}
-      and v = samples.%{j + 1} in
+      let u = sample ~dimension:j
+      and v = sample ~dimension:(j + 1) in
       samples_index := j + 2;
       u, v
   in
-  let add_mul a b c = Color.Infix.(a + (b * c)) in
+  let add_mul a b c = Color.fma b c a in
   let rec loop ray max_bounces emit0 attn0 =
     if max_bounces <= 0
     then add_mul emit0 attn0 Color.black
@@ -82,60 +77,35 @@ let create
     ~diffuse_plus_light
   =
   let trace_path =
-    Staged.unstage @@ path_tracer ~intersect ~background ~diffuse_plus_light ~camera
+    Staged.unstage
+    @@ path_tracer ~intersect ~background ~diffuse_plus_light ~camera ~max_bounces
   in
-  let max_area = 32 * 32 in
-  let tiles = Tile.split ~max_area (Tile.create ~width ~height) in
-  { width; height; write_pixel; samples_per_pixel; max_bounces; trace_path; tiles }
+  { width; height; write_pixel; samples_per_pixel; max_bounces; trace_path }
 ;;
 
-let gamma = Color.map ~f:Float.sqrt
+let create_sampler t = L.create ~dimension:(2 + (2 * t.max_bounces))
 
-let render_tile t tile tile_sampler =
+let render ~update_progress t =
   let widthf = 1 // t.width in
   let heightf = 1 // t.height in
-  let spp_invf = 1 // t.samples_per_pixel in
-  let sampler = ref tile_sampler in
-  Tile.iter tile ~f:(fun ~x ~y ->
+  let lds = create_sampler t in
+  for pass = 0 to t.samples_per_pixel - 1 do
+    let offset' = ref pass in
+    for y = 0 to t.height - 1 do
       let yf = Float.of_int (t.height - 1 - y) in
-      let xf = Float.of_int x in
-      let color = ref Color.black in
-      for _ = 1 to t.samples_per_pixel do
-        let sampler', s = L.step !sampler in
-        sampler := sampler';
-        let open L.Sample in
-        let dx = s.%{0}
-        and dy = s.%{1} in
+      for x = 0 to t.width - 1 do
+        let xf = Float.of_int x in
+        let offset = !offset' in
+        offset' := offset + t.samples_per_pixel;
+        let sample ~dimension = L.get lds ~offset ~dimension in
+        let dx = sample ~dimension:0
+        and dy = sample ~dimension:1 in
         let cx = (xf +. dx) *. widthf in
         let cy = (yf +. dy) *. heightf in
-        color := Color.Infix.( + ) !color @@ t.trace_path ~cx ~cy t.max_bounces s
+        let color = t.trace_path ~cx ~cy ~sample in
+        t.write_pixel ~x ~y color
       done;
-      t.write_pixel ~x ~y @@ gamma (Color.scale !color spp_invf))
-;;
-
-let create_tile_samplers t tiles =
-  let s = ref (L.create ~dimension:(2 + (2 * (t.max_bounces + 1)))) in
-  List.map tiles ~f:(fun tile ->
-      let n = t.samples_per_pixel * Tile.area tile in
-      let tile_sampler, suffix = L.split_at !s n in
-      s := suffix;
-      tile, tile_sampler)
-;;
-
-let render ?pool ~update_progress t =
-  let ts = create_tile_samplers t t.tiles in
-  match pool with
-  | None ->
-    List.iter ts ~f:(fun (tile, sampler) ->
-        render_tile t tile sampler;
-        update_progress ())
-  | Some pool ->
-    let module Task = Domainslib.Task in
-    let tasks =
-      List.map ts ~f:(fun (tile, sampler) ->
-          Task.async pool (fun () ->
-              render_tile t tile sampler;
-              update_progress ()))
-    in
-    List.iter tasks ~f:(fun t -> Task.await pool t)
+      update_progress t.width
+    done
+  done
 ;;

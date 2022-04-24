@@ -7,6 +7,10 @@ module Coord = struct
     }
 
   let create u v = { u; v }
+  let t00 = create 0.0 0.0
+  let t01 = create 0.0 1.0
+  let t10 = create 1.0 0.0
+  let t11 = create 1.0 1.0
 end
 
 type t = Coord.t -> Color.t

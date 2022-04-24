@@ -3,5 +3,11 @@
  (name main)
  (public_name ganesha)
  (preprocess
-  (pps ppx_base))
- (libraries base stdio path_tracer ply_format render_command triangle))
+  (pps ppx_base ppx_sexp_conv))
+ (libraries
+  base
+  stdio
+  path_tracer
+  ply_format
+  triangle
+  progressive_photon_map))

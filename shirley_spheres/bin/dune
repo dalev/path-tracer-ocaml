@@ -4,7 +4,7 @@
  (name main)
  (preprocess
   (pps ppx_base))
- (libraries base path_tracer render_command sphere stdio)
+ (libraries base cmdliner path_tracer render_command sphere stdio)
  (foreign_archives sphere_intersect))
 
 (rule
@@ -22,11 +22,12 @@
      %{project_root}/sphere-intersect-rs
      (setenv
       RUSTFLAGS
-      "-C target-cpu=native"
+      "-C target-cpu=native -C link-args=-Wl,-undefined,dynamic_lookup"
       (run cargo build --release)))
     (copy
-     %{project_root}/sphere-intersect-rs/target/release/libsphere_intersect.a
+     %{project_root}/sphere-intersect-rs/target/release/libsphere_intersect%{ext_lib}
      libsphere_intersect.a)
     (copy
-     %{project_root}/sphere-intersect-rs/target/release/libsphere_intersect.so
+     ;%{project_root}/sphere-intersect-rs/target/release/libsphere_intersect%{ext_dll}
+     %{project_root}/sphere-intersect-rs/target/release/libsphere_intersect.dylib
      dllsphere_intersect.so)))))

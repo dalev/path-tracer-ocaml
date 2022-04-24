@@ -10,6 +10,8 @@ module Face = struct
     }
 
   let vertices t = t.vertices
+  let material t = t.material
+  let tex_coords t = t.texs
 end
 
 module Triangle = struct
@@ -18,8 +20,6 @@ module Triangle = struct
   let create ~material (a, ta) (b, tb) (c, tc) =
     { Face.material; vertices = a, b, c; texs = ta, tb, tc }
   ;;
-
-  let material t = t.Face.material
 
   let transform t ~f =
     let a, b, c = Face.vertices t in
@@ -40,16 +40,11 @@ let triangle_fan ~material pts =
   loop (List.tl_exn pts) []
 ;;
 
-let t00 = Texture.Coord.create 0.0 0.0
-let t01 = Texture.Coord.create 0.0 1.0
-let t10 = Texture.Coord.create 1.0 0.0
-let t11 = Texture.Coord.create 1.0 1.0
-
 let quad ~material a u v =
   let b = P3.translate a v in
   let c = P3.translate b u in
   let d = P3.translate a u in
-  triangle_fan ~material [ a, t00; b, t10; c, t11; d, t01 ]
+  triangle_fan ~material Texture.Coord.[ a, t00; b, t10; c, t11; d, t01 ]
 ;;
 
 let solid_tex r g b = Texture.solid (Color.create ~r ~g ~b)
@@ -135,28 +130,7 @@ end = struct
     let to_scatter t ray =
       match t with
       | S { t_hit; sphere } -> Sphere.hit sphere t_hit ray
-      | T tri_hit ->
-        let open Float.O in
-        let module H = Triangle.Hit in
-        let tri = H.face tri_hit in
-        let g_normal = H.g_normal tri_hit in
-        let pt = H.point tri_hit in
-        let tex_coord =
-          let module C = Texture.Coord in
-          let ta, tb, tc = tri.texs in
-          let u, v = H.barycentric tri_hit in
-          let w = 1.0 - u - v in
-          let tu = (ta.u * w) + (tb.u * u) + (tc.u * v)
-          and tv = (ta.v * w) + (tb.v * u) + (tc.v * v) in
-          C.create tu tv
-        in
-        let hit_front = V3.dot (Ray.direction ray) g_normal < 0.0 in
-        let normal = if hit_front then g_normal else V3.Infix.( ~- ) g_normal in
-        let ss = Shader_space.create normal pt in
-        let wi = Shader_space.omega_i ss ray in
-        let material = Triangle.material tri in
-        let do_scatter = Material.scatter material ss tex_coord ~omega_i:wi ~hit_front in
-        { Hit.shader_space = ss; emit = Color.black; do_scatter }
+      | T tri_hit -> Triangle.Hit.to_hit tri_hit ray
     ;;
   end
 
@@ -180,56 +154,7 @@ end = struct
   ;;
 end
 
-module Args = struct
-  type t =
-    { width : int
-    ; height : int
-    ; iterations : int
-    ; max_bounces : int
-    ; photon_count : int
-    ; alpha : float
-    ; output : string
-    }
-
-  let parse ?(specs = []) () =
-    let width = ref 600 in
-    let height = ref !width in
-    let iterations = ref 10 in
-    let photon_count = ref 75_000 in
-    let file = ref "output.png" in
-    let alpha = ref (2 // 3) in
-    let no_progress = ref false in
-    let max_bounces = ref 4 in
-    let usage_msg =
-      Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width !height !file
-    in
-    let specs =
-      specs
-      @ Caml.Arg.
-          [ "-width", Set_int width, "<integer> image width"
-          ; "-height", Set_int height, "<integer> image height"
-          ; "-iterations", Set_int iterations, "<integer> # photon-map iterations"
-          ; "-photon-count", Set_int photon_count, "<integer> #photons per iteration"
-          ; "-alpha", Set_float alpha, "<float-in-(0,1)> photon-map alpha"
-          ; "-o", Set_string file, "<file> output file"
-          ; "-no-progress", Set no_progress, "suppress progress monitor"
-          ; "-max-bounces", Set_int max_bounces, "<integer> max ray bounces"
-          ]
-    in
-    Caml.Arg.parse
-      specs
-      (fun (_ : string) -> failwith "No anonymous arguments expected")
-      usage_msg;
-    { width = !width
-    ; height = !height
-    ; iterations = !iterations
-    ; max_bounces = !max_bounces
-    ; photon_count = !photon_count
-    ; alpha = !alpha
-    ; output = !file
-    }
-  ;;
-end
+module Args = Progressive_photon_map.Args
 
 module Shape_tree = Shape_tree.Make (Shape_tree.Array_leaf (struct
   include Shape
@@ -293,18 +218,13 @@ let main argv =
     Shape_tree.create @@ List.map shapes ~f:(fun t -> Shape.transform t ~f)
   in
   let module Scene = struct
-    let width = width
-    let height = height
+    let args = argv
     let camera = camera
-    let num_iterations = argv.Args.iterations
-    let max_bounces = argv.Args.max_bounces
-    let photon_count = argv.Args.photon_count
-    let alpha = argv.Args.alpha
     let bbox = Shape_tree.bbox tree
 
-    let point_lights =
+    let lights =
       let position = Camera.transform camera light_center in
-      [ Ppm.Point_light.create ~position ~power:2.0 ~color:Color.white ]
+      [ Ppm.Light.create_point ~position ~power:2.0 ~color:Color.white ]
     ;;
 
     let intersect ray =
@@ -315,12 +235,10 @@ let main argv =
   end
   in
   let module Ppm = Ppm.Make (Scene) in
-  let num_additional_domains = 7 in
-  let pool = Domainslib.Task.setup_pool ~num_additional_domains in
   let start = Time_now.nanoseconds_since_unix_epoch () in
-  let () = Ppm.go pool "output.png" in
+  let output = argv.Args.output in
+  let () = Ppm.go ~output in
   let elapsed_ns = Int63.O.(Time_now.nanoseconds_since_unix_epoch () - start) in
-  Domainslib.Task.teardown_pool pool;
   Stdio.printf "render time = %.3f ms\n" (1e-6 *. Float.of_int63 elapsed_ns)
 ;;
 

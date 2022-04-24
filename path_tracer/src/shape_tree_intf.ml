@@ -21,7 +21,7 @@ module Sig (L : Leaf) = struct
     type elt_hit
 
     (** default [num_bins] = 32 *)
-    val create : ?pool:Domainslib.Task.pool -> ?num_bins:int -> elt list -> t
+    val create : ?num_bins:int -> elt list -> t
 
     val depth : t -> int
     val length : t -> int

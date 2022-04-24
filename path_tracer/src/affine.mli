@@ -38,6 +38,9 @@ module V3 : sig
   val map : t -> f:(float -> float) -> t
   val map2 : t -> t -> f:(float -> float -> float) -> t
 
+  (** [fma u v w] is like [Infix.(u * v + w)], but it uses fused-multiply-add ops. *)
+  val fma : t -> t -> t -> t
+
   module Infix : sig
     val ( + ) : t -> t -> t
     val ( - ) : t -> t -> t

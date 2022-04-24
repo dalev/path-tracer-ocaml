@@ -1,8 +1,58 @@
 open Base
 open Path_tracer
 open Stdio
-module L = Low_discrepancy_sequence.Simple
-module Task = Domainslib.Task
+module L = Low_discrepancy_sequence
+
+module Args = struct
+  type t =
+    { width : int
+    ; height : int
+    ; iterations : int
+    ; max_bounces : int
+    ; photon_count : int
+    ; alpha : float
+    ; output : string
+    }
+
+  let parse ?(specs = []) () =
+    let width = ref 600 in
+    let height = ref !width in
+    let iterations = ref 10 in
+    let photon_count = ref 75_000 in
+    let file = ref "output.png" in
+    let alpha = ref (2 // 3) in
+    let no_progress = ref false in
+    let max_bounces = ref 4 in
+    let usage_msg =
+      Printf.sprintf "Defaults: width = %d, height = %d, output = %s" !width !height !file
+    in
+    let specs =
+      specs
+      @ Caml.Arg.
+          [ "-width", Set_int width, "<integer> image width"
+          ; "-height", Set_int height, "<integer> image height"
+          ; "-iterations", Set_int iterations, "<integer> # photon-map iterations"
+          ; "-photon-count", Set_int photon_count, "<integer> #photons per iteration"
+          ; "-alpha", Set_float alpha, "<float-in-(0,1)> photon-map alpha"
+          ; "-o", Set_string file, "<file> output file"
+          ; "-no-progress", Set no_progress, "suppress progress monitor"
+          ; "-max-bounces", Set_int max_bounces, "<integer> max ray bounces"
+          ]
+    in
+    Caml.Arg.parse
+      specs
+      (fun (_ : string) -> failwith "No anonymous arguments expected")
+      usage_msg;
+    { width = !width
+    ; height = !height
+    ; iterations = !iterations
+    ; max_bounces = !max_bounces
+    ; photon_count = !photon_count
+    ; alpha = !alpha
+    ; output = !file
+    }
+  ;;
+end
 
 type sampler = offset:int -> dimension:int -> float
 
@@ -16,8 +66,6 @@ module Point_light = struct
     let color = Color.scale color power in
     { position; color }
   ;;
-
-  let color t = t.color
 
   let random_direction u v =
     let open Float.O in
@@ -33,6 +81,62 @@ module Point_light = struct
   let random_ray t u v =
     let dir = random_direction u v in
     Ray.create t.position dir
+  ;;
+end
+
+module Spot_light = struct
+  type t =
+    { shader_space : Shader_space.t
+    ; color : Color.t
+    }
+
+  let angle = 0.5 *. 45.0 *. Float.pi /. 180.0
+  let disk_radius = Float.atan angle
+
+  let create ~position ~direction ~color ~power =
+    let color = Color.scale color power in
+    let shader_space = Shader_space.create (V3.normalize direction) position in
+    { shader_space; color }
+  ;;
+
+  let random_ray t u v =
+    let open Float.O in
+    let r = disk_radius * Float.sqrt u in
+    let theta = v * 2.0 * Float.pi in
+    let x = r * Float.cos theta in
+    let y = r * Float.sin theta in
+    let z = 1.0 in
+    Shader_space.world_ray t.shader_space @@ V3.create ~x ~y ~z
+  ;;
+end
+
+module Light = struct
+  type t =
+    | Point of Point_light.t
+    | Spot of Spot_light.t
+
+  let random_ray t u v =
+    match t with
+    | Point l -> Point_light.random_ray l u v
+    | Spot l -> Spot_light.random_ray l u v
+  ;;
+
+  let color = function
+    | Point l -> l.Point_light.color
+    | Spot l -> l.Spot_light.color
+  ;;
+
+  let power t =
+    let { V3.x; y; z } = Color.to_v3 @@ color t in
+    x +. y +. z
+  ;;
+
+  let create_spot ~position ~direction ~color ~power =
+    Spot (Spot_light.create ~position ~direction ~color ~power)
+  ;;
+
+  let create_point ~position ~color ~power =
+    Point (Point_light.create ~position ~color ~power)
   ;;
 end
 
@@ -64,13 +168,12 @@ module Photon_map : sig
   val length : t -> int
 
   val create
-    :  Task.pool
-    -> sampler
+    :  sampler
     -> scene_intersect:(Ray.t -> Hit.t option)
     -> radius:float
     -> photon_count:int
     -> max_bounces:int
-    -> point_lights:Point_light.t list
+    -> lights:Light.t list
     -> t
 end = struct
   module Tree = Shape_tree.Make (Shape_tree.Array_leaf (struct
@@ -147,62 +250,46 @@ end = struct
               loop ray flux max_bounces dim)))
     in
     let u, v = take_2d 0 in
-    let ray = Point_light.random_ray light u v in
+    let ray = Light.random_ray light u v in
     let dimension = 2 in
-    loop ray (Point_light.color light) max_bounces dimension;
+    loop ray (Light.color light) max_bounces dimension;
     !photons
   ;;
 
-  let create
-      pool
-      sampler
-      ~scene_intersect
-      ~radius
-      ~photon_count
-      ~max_bounces
-      ~point_lights
-    =
-    let module Chan = Domainslib.Chan in
-    let c = Chan.make_unbounded () in
-    let collector =
-      Caml.Domain.spawn (fun () ->
-          let rec loop photons =
-            match Chan.recv c with
-            | Some ps -> loop @@ List.rev_append ps photons
-            | None -> photons
-          in
-          loop [])
-    in
-    (* CR dalev: reuses sampler for different lights, fix me.  What we actually want
-    is to divide [photon_count] among all the lights in proportion to each light's
-    power. *)
-    List.iter point_lights ~f:(fun light ->
-        Task.parallel_for pool ~start:0 ~finish:(photon_count - 1) ~body:(fun i ->
-            let s ~dimension = sampler ~offset:i ~dimension in
-            Chan.send c @@ Some (trace_photon light s max_bounces scene_intersect ~radius)));
-    Chan.send c None;
-    let photons = Caml.Domain.join collector in
-    let length = List.length photons in
+  let create sampler ~scene_intersect ~radius ~photon_count ~max_bounces ~lights =
+    let total_power = List.sum (module Float) lights ~f:Light.power in
+    let offset = ref 0 in
+    let photons = ref [] in
+    List.iter lights ~f:(fun light ->
+        let f = Light.power light /. total_power in
+        let photon_count = Int.of_float @@ (Float.of_int photon_count *. f) in
+        let start = !offset in
+        let finish = start + photon_count - 1 in
+        offset := finish + 1;
+        for i = start to start + photon_count - 1 do
+          let s ~dimension = sampler ~offset:i ~dimension in
+          photons := trace_photon light s max_bounces scene_intersect ~radius @ !photons
+        done);
+    let length = List.length !photons in
     if length = 0 then failwith "BUG: no photons";
     let num_bins = 8 in
-    { tree = Tree.create ~pool ~num_bins photons; length }
+    { tree = Tree.create ~num_bins !photons; length }
   ;;
 end
 
 module Make (Scene : sig
   val bbox : Bbox.t
   val camera : Camera.t
-  val point_lights : Point_light.t list
+  val lights : Light.t list
   val intersect : Ray.t -> Hit.t option
-  val width : int
-  val height : int
-  val max_bounces : int
-  val num_iterations : int
-  val photon_count : int
-  val alpha : float
+  val args : Args.t
 end) =
 struct
   open Scene
+
+  let { Args.photon_count; width; height; alpha; iterations; max_bounces; output = _ } =
+    args
+  ;;
 
   let inv_photon_count = 1 // photon_count
 
@@ -215,7 +302,7 @@ struct
 
   let create_blank_image () = Bimage.Image.v Bimage.Type.f64 Bimage.Color.rgb width height
 
-  let render_image img pool sampler pmap =
+  let render_image img sampler pmap =
     let module Image = Bimage.Image in
     let module Pixel = Bimage.Pixel in
     let write_pixel ~x ~y color =
@@ -290,18 +377,14 @@ struct
       let dimension = 2 in
       loop (Camera.ray camera cx cy) Color.white max_bounces dimension
     in
-    Task.parallel_for
-      ~chunk_size:(32 * 32)
-      pool
-      ~start:0
-      ~finish:((width * height) - 1)
-      ~body:(fun pixel ->
-        let x = pixel % width
-        and y = pixel / width in
-        let sampler ~dimension = sampler ~offset:pixel ~dimension in
-        let color' = estimate_color ~x ~y sampler in
-        let color = Color.scale color' inv_photon_count in
-        write_pixel ~x ~y color)
+    for pixel = 0 to (width * height) - 1 do
+      let x = pixel % width
+      and y = pixel / width in
+      let sampler ~dimension = sampler ~offset:pixel ~dimension in
+      let color' = estimate_color ~x ~y sampler in
+      let color = Color.scale color' inv_photon_count in
+      write_pixel ~x ~y color
+    done
   ;;
 
   let radius2 i =
@@ -320,54 +403,50 @@ struct
     L.get s ~offset:(offset + base) ~dimension
   ;;
 
-  let save_image img file_name =
-    match Bimage_io.write file_name img with
+  let save_image output ~img_avg ~img_sum n =
+    let one_over_n = 1 // n in
+    let sum_data = img_sum.Bimage.Image.data in
+    let avg_data = img_avg.Bimage.Image.data in
+    let gamma x = x **. (1.0 /. 2.2) in
+    for i = 0 to (3 * width * height) - 1 do
+      let f = Bigarray.Array1.get sum_data i in
+      Bigarray.Array1.set avg_data i (gamma (f *. one_over_n))
+    done;
+    match Bimage_unix.Stb.write output img_avg with
     | Ok () -> ()
-    | Error (`File_not_found s) -> failwith @@ "file not found: " ^ s
     | Error (#Bimage.Error.t as e) -> Bimage.Error.exc e
   ;;
 
-  let go pool file_name =
+  let go ~output =
     printf "#max-bounces = %d\n" max_bounces;
     printf "#photons/iter = %d\n" photon_count;
-    printf "#iterations = %d\n" num_iterations;
+    printf "#iterations = %d\n" iterations;
     printf "-----\n%!";
-    let p_sampler = L.create ~dimensions:(2 + (2 * max_bounces)) in
+    let p_sampler = L.create ~dimension:(2 + (2 * max_bounces)) in
     let e_sampler =
       (* eye paths terminate at the first diffuse interaction, and so they only use
       one sample dimension per bounce. *)
-      L.create ~dimensions:(2 + max_bounces)
+      L.create ~dimension:(2 + max_bounces)
     in
     let img_sum = create_blank_image () in
     let img_avg = create_blank_image () in
-    for i = 0 to num_iterations - 1 do
+    for i = 0 to iterations - 1 do
       let radius = radius (i + 1) in
       printf "#iteration = %d, radius = %.3f\n%!" i radius;
       let pmap =
         Photon_map.create
-          pool
           (offset_sampler p_sampler (i * photon_count))
           ~scene_intersect:Scene.intersect
           ~photon_count
           ~max_bounces
           ~radius
-          ~point_lights
+          ~lights
       in
       printf "  photon map length = %d\n%!" (Photon_map.length pmap);
       let eye_sample_base = i * width * height in
-      render_image img_sum pool (offset_sampler e_sampler eye_sample_base) pmap;
-      let n = 1 // (i + 1) in
-      let sum_data = img_sum.Bimage.Image.data in
-      let avg_data = img_avg.Bimage.Image.data in
-      let gamma x = x **. (1.0 /. 2.2) in
-      Task.parallel_for
-        pool
-        ~start:0
-        ~finish:((3 * width * height) - 1)
-        ~body:(fun i ->
-          let f = Bigarray.Array1.get sum_data i in
-          Bigarray.Array1.set avg_data i (gamma (f *. n)));
-      save_image img_avg file_name
+      render_image img_sum (offset_sampler e_sampler eye_sample_base) pmap;
+      let n = i + 1 in
+      save_image output ~img_avg ~img_sum n
     done
   ;;
 end

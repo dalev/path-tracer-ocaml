@@ -9,14 +9,17 @@ module Args = struct
     ; no_simd : bool
     }
 
-  let parse () =
-    let no_simd = ref false in
-    let common =
-      Common_args.parse
-        ~specs:[ "-no-simd", Set no_simd, "do not use SIMD accelerated intersection" ]
-        ()
+  let term =
+    let open Cmdliner in
+    let docs = Manpage.s_options in
+    let no_simd =
+      let doc =
+        "use plain ocaml sphere intersection instead of FFI call to rust implementation"
+      in
+      Arg.(value & flag & info [ "no-simd" ] ~docs ~doc)
     in
-    { common; no_simd = !no_simd }
+    let mk common no_simd = { common; no_simd } in
+    Term.(const mk $ Common_args.term $ no_simd)
   ;;
 end
 
@@ -42,7 +45,7 @@ module Shirley_spheres = struct
   let big_spheres =
     let glass = Material.glass in
     let metal = Material.metal (solid_tex 0.7 0.6 0.5) in
-    let blue = solid_lambertian 0.0 0.1 0.4 in
+    let blue = solid_lambertian 0.1 0.1 0.7 in
     let radius = 1.0 in
     [ Sphere.create ~material:glass ~center:(p3 (-4.0) 1.0 0.0) ~radius
     ; Sphere.create ~material:metal ~center:(p3 0.0 1.0 0.0) ~radius
@@ -115,7 +118,7 @@ module Array_leaf : Leaf_S = Shape_tree.Array_leaf (struct
   type hit = float * Sphere.t
 
   let hit_t = fst
-  let length_cutoff = 8
+  let length_cutoff = 4
   let depth _ = 0
   let length _ = 1
 
@@ -249,13 +252,12 @@ let main { Args.common; no_simd } =
   in
   printf "dim = %d x %d;\n" width height;
   printf "#spheres = %d\n" (List.length spheres);
-  let pool = Domainslib.Task.setup_pool ~num_additional_domains:7 in
   let camera = camera (width // height) in
   let elapsed, tree =
     let spheres =
       List.map spheres ~f:(fun s -> Sphere.transform s ~f:(Camera.transform camera))
     in
-    Render_command.with_elapsed_time (fun () -> Spheres.create ~pool spheres)
+    Render_command.with_elapsed_time (fun () -> Spheres.create spheres)
   in
   printf "tree depth = %d\n" (Spheres.depth tree);
   printf "build time = %.3f ms\n" (Float.of_int63 elapsed *. 1e-6);
@@ -274,8 +276,16 @@ let main { Args.common; no_simd } =
       ;;
     end)
   in
-  Render_cmd.run ~pool common;
-  Domainslib.Task.teardown_pool pool
+  Render_cmd.run common
 ;;
 
-let () = main (Args.parse ())
+let main_cmd =
+  let open Cmdliner in
+  let man = [ `S Manpage.s_description; `P "Render some spheres." ] in
+  let sdocs = Manpage.s_common_options in
+  let doc = "render Shirley spheres" in
+  let info = Cmd.info "shirley_spheres" ~doc ~sdocs ~man in
+  Cmd.v info Term.(const main $ Args.term)
+;;
+
+let () = Caml.exit @@ Cmdliner.Cmd.eval main_cmd

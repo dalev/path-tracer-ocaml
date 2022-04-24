@@ -1,6 +1,6 @@
 open! Base
 module Bigstring = Base_bigstring
-module Bigsubstring = Core_kernel.Bigsubstring
+module Bigsubstring = Core.Bigsubstring
 
 let ( let* ) m f = Or_error.bind m ~f
 let error_s = Or_error.error_s
@@ -263,7 +263,7 @@ module Header = struct
     | Some line ->
       (match String.split ~on:' ' line with
       | [ "format"; format_str; "1.0" ] -> Format.of_string format_str
-      | _ -> error_s [%message "cannot parse format line" ~line:(line : string)])
+      | _ -> error_s [%message "cannot parse format line" ~(line : string)])
   ;;
 
   let parse_elements t =

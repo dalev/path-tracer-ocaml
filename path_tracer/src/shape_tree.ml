@@ -1,6 +1,5 @@
 open Base
 include Shape_tree_intf
-module Task = Domainslib.Task
 
 module Bshape = struct
   type 'a t =
@@ -184,8 +183,8 @@ module Make (L : Leaf) = struct
       Leaf { bbox; leaf = L.of_elts (Slice.to_array_map shapes ~f:Bshape.shape) }
     ;;
 
-    let create ?pool ~num_bins bbox shapes =
-      let rec loop bbox shapes ~depth =
+    let create ~num_bins bbox shapes =
+      let rec loop bbox shapes =
         if Slice.length shapes <= L.length_cutoff
         then make_leaf bbox shapes
         else (
@@ -199,22 +198,12 @@ module Make (L : Leaf) = struct
             else (
               let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
               let axis = V3.axis @@ Proposal.axis p in
-              let rhs_box = Proposal.rhs_box p in
-              let spawn_rhs = Int.O.(Slice.length r >= 5000 && depth < 8) in
-              let depth = Int.O.(depth + 1) in
-              let do_rhs =
-                let thunk () = loop rhs_box r ~depth in
-                match pool with
-                | Some pool when spawn_rhs ->
-                  let t = Task.async pool thunk in
-                  fun () -> Task.await pool t
-                | _ -> thunk
-              in
-              let lhs = loop (Proposal.lhs_box p) l ~depth in
-              let rhs = do_rhs () in
+              let lhs_box, rhs_box = Proposal.lhs_box p, Proposal.rhs_box p in
+              let lhs = loop lhs_box l in
+              let rhs = loop rhs_box r in
               Branch { lhs; rhs; bbox; axis }))
       in
-      loop bbox shapes ~depth:0
+      loop bbox shapes
     ;;
 
     let intersect t ray ~t_min ~t_max =
@@ -271,34 +260,16 @@ module Make (L : Leaf) = struct
   let intersect t ray ~t_min ~t_max = Tree.intersect t.root ray ~t_min ~t_max
   let fold_neighbors t point ~init ~f = Tree.fold_neighbors t.root point ~init ~f
 
-  let chunks slice =
-    let len = Slice.length slice / 8 in
-    let rec loop slice chunks =
-      if Slice.length slice <= len
-      then slice :: chunks
-      else (
-        let pre, suf = Slice.split_at slice len in
-        loop suf (pre :: chunks))
-    in
-    loop slice []
-  ;;
-
-  let create ?pool ?(num_bins = 32) elts =
+  let create ?(num_bins = 32) elts =
     assert (num_bins >= 4);
     if List.is_empty elts
     then failwith "Shape_tree.create: expected non-empty list of shapes";
     let elts = Array.of_list_map elts ~f:(Bshape.create L.elt_bbox) |> Slice.create in
     let bbox =
       let slice_bbox = Slice.map_reduce ~transform:Bshape.bbox ~combine:Bbox.union in
-      match pool with
-      | None -> slice_bbox elts
-      | Some pool ->
-        let tasks =
-          List.map (chunks elts) ~f:(fun s -> Task.async pool (fun () -> slice_bbox s))
-        in
-        List.map tasks ~f:(Task.await pool) |> List.reduce_exn ~f:Bbox.union
+      slice_bbox elts
     in
-    let root = Tree.create ?pool ~num_bins bbox elts in
+    let root = Tree.create ~num_bins bbox elts in
     { root }
   ;;
 end

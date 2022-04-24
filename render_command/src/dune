@@ -3,8 +3,9 @@
  (libraries
   base
   bimage
-  bimage-io
-  domainslib
+  bimage-unix
+  cmdliner
+  filter_kernel
   path_tracer
   progress
   stdio

@@ -10,7 +10,7 @@ module Args : sig
     ; max_bounces : int
     }
 
-  val parse : ?specs:(string * Caml.Arg.spec * string) list -> unit -> t
+  val term : t Cmdliner.Term.t
 end
 
 val with_elapsed_time : (unit -> 'a) -> Int63.t * 'a
@@ -20,5 +20,5 @@ module Make (Scene : sig
   val intersect : Path_tracer.Ray.t -> Path_tracer.Hit.t option
   val background : Path_tracer.Ray.t -> Path_tracer.Color.t
 end) : sig
-  val run : ?pool:Domainslib.Task.pool -> Args.t -> unit
+  val run : Args.t -> unit
 end

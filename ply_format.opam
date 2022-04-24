@@ -6,16 +6,16 @@ authors: ["Dale Vaillancourt"]
 homepage: "https://github.com/dalev/path-tracer-ocaml"
 bug-reports: "https://github.com/dalev/path-tracer-ocaml/issues"
 depends: [
-  "dune" {>= "2.9"}
-  "alcotest" {>= "1.4.0" & with-test}
-  "core_kernel" {>= "v0.14.1"}
-  "ppx_sexp_message" {>= "v0.14.1"}
-  "ppx_base" {>= "v0.14.0"}
-  "parsexp" {>= "v0.14.1"}
-  "bigstringaf" {>= "0.8.0"}
-  "base_bigstring" {>= "v0.14.0"}
-  "base" {>= "v0.14.1"}
-  "ocaml" {>= "4.12"}
+  "dune" {>= "3.0"}
+  "alcotest" {>= "1.5.0" & with-test}
+  "core_kernel" {>= "v0.15.0"}
+  "ppx_sexp_message" {>= "v0.15.0"}
+  "ppx_base" {>= "v0.15.0"}
+  "parsexp" {>= "v0.15.0"}
+  "bigstringaf" {>= "0.9.0"}
+  "base_bigstring" {>= "v0.15.0"}
+  "base" {>= "v0.15.0"}
+  "ocaml" {>= "4.14"}
   "odoc" {with-doc}
 ]
 build: [
@@ -27,11 +27,9 @@ build: [
     name
     "-j"
     jobs
-    "--promote-install-files=false"
     "@install"
     "@runtest" {with-test}
     "@doc" {with-doc}
   ]
-  ["dune" "install" "-p" name "--create-install-files" name]
 ]
 dev-repo: "git+https://github.com/dalev/path-tracer-ocaml.git"

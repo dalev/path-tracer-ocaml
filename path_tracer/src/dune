@@ -3,4 +3,4 @@
  (public_name path_tracer)
  (preprocess
   (pps ppx_base ppx_sexp_message))
- (libraries base domainslib low_discrepancy_sequence))
+ (libraries base low_discrepancy_sequence))

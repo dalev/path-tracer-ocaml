@@ -1,0 +1,4 @@
+{
+    "rust-analyzer.checkOnSave.target": "x86_64-pc-windows-msvc",
+    "rust-analyzer.checkOnSave.allTargets": false
+}
