@@ -2,8 +2,6 @@ A simple quasi-Monte-Carlo path tracer as described by [Peter Shirley's Ray Trac
 
 ![Our rendering of Shirley's test scene at 32 samples per pixel](https://github.com/dalev/path-tracer-ocaml/blob/main/shirley-spheres.png?raw=true)
 
-It's implemented in [Ocaml](https://ocaml.org) and a little bit of [Rust](https://rust-lang.org).  The Rust portion only works on x86-64:  it uses AVX intrinsics to intersect a ray with four spheres at a time.
+It's implemented in [Ocaml](https://ocaml.org) and a little bit of [Rust](https://rust-lang.org).  On x86-64, the rust code uses AVX intrinsics to intersect a ray with four spheres at a time.
 
-To build, you'll need [Multicore Ocaml](https://github.com/ocaml-multicore/multicore-opam) and Rust installed.
-
-To build, run `dune build --release`.  To generate the above image, run `dune exec --release shirley_spheres -- -samples-per-pixel 32 -max-bounces 4 -width 600 -height 300`.  Increase `-samples-per-pixel` and/or `-max-bounces` to render a higher quality image.  Pass the `-help` flag to see other options.
+To build, run `dune build --release`.  To generate the above image, run `dune exec --release shirley_spheres -- --dimension=600,300 --samples-per-pixel=32 --max-ray-bounces=4`.  Increase `--samples-per-pixel` and/or `--max-ray-bounces` to render a higher quality image.  Pass the `--help` flag to see other options.
