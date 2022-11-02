@@ -83,16 +83,16 @@ end = struct
     let width_minus_one = t.raw_img.Image.width - 1 in
     let height_minus_one = t.raw_img.Image.height - 1 in
     Filter_kernel.iter t.filter_kernel ~f:(fun ~dx ~dy weight ->
-        let x = Int.clamp_exn (x + dx) ~min:0 ~max:width_minus_one
-        and y = Int.clamp_exn (y + dy) ~min:0 ~max:height_minus_one in
-        let incr ch v =
-          let a = Image.get t.raw_img x y ch in
-          Image.set t.raw_img x y ch (Caml.Float.fma weight v a)
-        in
-        let r, g, b = Color.to_rgb color in
-        incr 0 r;
-        incr 1 g;
-        incr 2 b)
+      let x = Int.clamp_exn (x + dx) ~min:0 ~max:width_minus_one
+      and y = Int.clamp_exn (y + dy) ~min:0 ~max:height_minus_one in
+      let incr ch v =
+        let a = Image.get t.raw_img x y ch in
+        Image.set t.raw_img x y ch (Caml.Float.fma weight v a)
+      in
+      let r, g, b = Color.to_rgb color in
+      incr 0 r;
+      incr 1 g;
+      incr 2 b)
   ;;
 
   let save_exn t =
@@ -146,7 +146,7 @@ struct
           Progress.Config.v ~min_interval ()
         in
         Progress.with_reporter ~config p (fun report ->
-            Integrator.render i ~update_progress:report)
+          Integrator.render i ~update_progress:report)
       end
     in
     let elapsed, () = with_elapsed_time render in

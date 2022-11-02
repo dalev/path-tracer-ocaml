@@ -35,46 +35,46 @@ let path_tracer ~intersect ~background ~diffuse_plus_light ~camera ~max_bounces 
         let emit = Hit.emit h in
         let u, v = take_2d () in
         (match (Hit.scatter h u : Scatter.t) with
-        | Absorb -> add_mul emit0 attn0 emit
-        | Specular (scattered_ray, attenuation) ->
-          loop
-            scattered_ray
-            max_bounces
-            (add_mul emit attenuation emit0)
-            Color.Infix.(attenuation * attn0)
-        | Diffuse attenuation ->
-          let ss = Hit.shader_space h in
-          let dir = Pdf.sample diffuse_plus_light ss u v in
-          let diffuse_pd = Pdf.eval Pdf.diffuse dir ss in
-          if Float.( = ) diffuse_pd 0.0
-          then add_mul emit0 attn0 emit
-          else (
-            let divisor = Pdf.eval diffuse_plus_light dir ss in
-            let pd = diffuse_pd /. divisor in
-            if not (Float.is_finite pd)
-            then add_mul emit0 attn0 emit
-            else (
-              let scattered_ray = Shader_space.world_ray ss dir in
-              let attenuation = Color.scale attenuation pd in
-              loop
-                scattered_ray
-                max_bounces
-                (add_mul emit attenuation emit0)
-                Color.Infix.(attenuation * attn0)))))
+         | Absorb -> add_mul emit0 attn0 emit
+         | Specular (scattered_ray, attenuation) ->
+           loop
+             scattered_ray
+             max_bounces
+             (add_mul emit attenuation emit0)
+             Color.Infix.(attenuation * attn0)
+         | Diffuse attenuation ->
+           let ss = Hit.shader_space h in
+           let dir = Pdf.sample diffuse_plus_light ss u v in
+           let diffuse_pd = Pdf.eval Pdf.diffuse dir ss in
+           if Float.( = ) diffuse_pd 0.0
+           then add_mul emit0 attn0 emit
+           else (
+             let divisor = Pdf.eval diffuse_plus_light dir ss in
+             let pd = diffuse_pd /. divisor in
+             if not (Float.is_finite pd)
+             then add_mul emit0 attn0 emit
+             else (
+               let scattered_ray = Shader_space.world_ray ss dir in
+               let attenuation = Color.scale attenuation pd in
+               loop
+                 scattered_ray
+                 max_bounces
+                 (add_mul emit attenuation emit0)
+                 Color.Infix.(attenuation * attn0)))))
   in
   loop ray max_bounces Color.black Color.white
 ;;
 
 let create
-    ~width
-    ~height
-    ~write_pixel
-    ~samples_per_pixel
-    ~max_bounces
-    ~camera
-    ~intersect
-    ~background
-    ~diffuse_plus_light
+  ~width
+  ~height
+  ~write_pixel
+  ~samples_per_pixel
+  ~max_bounces
+  ~camera
+  ~intersect
+  ~background
+  ~diffuse_plus_light
   =
   let trace_path =
     Staged.unstage
