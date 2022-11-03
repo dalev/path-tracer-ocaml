@@ -20,12 +20,13 @@ let main ply =
   in
   let () =
     let ( .%{} ) = FArray.get in
-    let xs = floats_exn @@ Map.find_exn v "x" in
-    let ys = floats_exn @@ Map.find_exn v "y" in
-    let zs = floats_exn @@ Map.find_exn v "z" in
+    let find = Fn.compose floats_exn (Map.find_exn v) in
+    let xs = find "x"
+    and ys = find "y"
+    and zs = find "z" in
     List.iter2_exn [ "x"; "y"; "z" ] [ xs; ys; zs ] ~f:(fun fld floats ->
-        let is_finite = FArray.for_all Float.is_finite floats in
-        printf "%s all finite: %b\n" fld is_finite);
+      let is_finite = FArray.for_all Float.is_finite floats in
+      printf "%s all finite: %b\n" fld is_finite);
     let reduce f fs = FArray.fold_left f fs.%{0} fs in
     let min = reduce Float.min in
     let max = reduce Float.max in
@@ -37,18 +38,18 @@ let main ply =
   | None -> failwith "ply data contains no vertex_indices property"
   | Some inner_map ->
     (match Map.find inner_map "rows" with
-    | None -> failwith "BUG: vertex_indices has no rows property"
-    | Some (Floats _) -> failwith "got Floats, expected Rows"
-    | Some (Ints _) -> failwith "got Ints, expected Rows"
-    | Some (Rows faces) ->
-      let h = Hashtbl.create (module Int) in
-      Array.iter faces ~f:(fun face ->
-          let face_size = Array.length face in
-          Hashtbl.update h face_size ~f:(function
-              | None -> 1
-              | Some n -> n + 1));
-      printf "\n== Face sizes ==\n";
-      Hashtbl.iteri h ~f:(fun ~key:size ~data:count -> printf "%d-gons: %d\n" size count))
+     | None -> failwith "BUG: vertex_indices has no rows property"
+     | Some (Floats _) -> failwith "got Floats, expected Rows"
+     | Some (Ints _) -> failwith "got Ints, expected Rows"
+     | Some (Rows faces) ->
+       let h = Hashtbl.create (module Int) in
+       Array.iter faces ~f:(fun face ->
+         let face_size = Array.length face in
+         Hashtbl.update h face_size ~f:(function
+           | None -> 1
+           | Some n -> n + 1));
+       printf "\n== Face sizes ==\n";
+       Hashtbl.iteri h ~f:(fun ~key:size ~data:count -> printf "%d-gons: %d\n" size count))
 ;;
 
 let () =
