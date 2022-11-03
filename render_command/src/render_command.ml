@@ -55,56 +55,6 @@ let with_elapsed_time f =
   elapsed, x
 ;;
 
-module Film : sig
-  type t
-
-  val create : width:int -> height:int -> output:string -> samples_per_pixel:int -> t
-  val save_exn : t -> unit
-  val write_pixel : t -> x:int -> y:int -> Color.t -> unit
-end = struct
-  type t =
-    { raw_img : [ `Rgb ] Bimage.image_f64
-    ; output : string
-    ; samples_per_pixel : int
-    ; filter_kernel : Filter_kernel.t
-    }
-
-  let color_space = Bimage.rgb
-  let mkImage width height = Image.v Bimage.f64 color_space width height
-  let pixel_radius = 1
-
-  let create ~width ~height ~output ~samples_per_pixel =
-    let raw_img = mkImage width height in
-    let filter_kernel = Filter_kernel.Binomial.create ~order:5 ~pixel_radius in
-    { raw_img; output; samples_per_pixel; filter_kernel }
-  ;;
-
-  let write_pixel t ~x ~y color =
-    let width_minus_one = t.raw_img.Image.width - 1 in
-    let height_minus_one = t.raw_img.Image.height - 1 in
-    Filter_kernel.iter t.filter_kernel ~f:(fun ~dx ~dy weight ->
-      let x = Int.clamp_exn (x + dx) ~min:0 ~max:width_minus_one
-      and y = Int.clamp_exn (y + dy) ~min:0 ~max:height_minus_one in
-      let incr ch v =
-        let a = Image.get t.raw_img x y ch in
-        Image.set t.raw_img x y ch (Caml.Float.fma weight v a)
-      in
-      let r, g, b = Color.to_rgb color in
-      incr 0 r;
-      incr 1 g;
-      incr 2 b)
-  ;;
-
-  let save_exn t =
-    let spp_inv = 1 // t.samples_per_pixel in
-    let gamma f = Float.sqrt (f *. spp_inv) in
-    let gamma_encoded_img = Bimage.Image.map_inplace gamma t.raw_img in
-    match Bimage_unix.Stb.write t.output gamma_encoded_img with
-    | Ok () -> ()
-    | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other)
-  ;;
-end
-
 module Make (Scene : sig
   val camera : Camera.t
   val intersect : Ray.t -> Hit.t option
@@ -112,13 +62,20 @@ module Make (Scene : sig
 end) =
 struct
   let run { Args.width; height; max_bounces; samples_per_pixel; no_progress; output } =
-    let film = Film.create ~width ~height ~output ~samples_per_pixel in
-    let write_pixel = Film.write_pixel film in
+    let image = Image.v Bimage.f64 Bimage.rgb width height in
+    let save_exn () =
+      let spp_inv = 1 // samples_per_pixel in
+      let gamma f = Float.sqrt (f *. spp_inv) in
+      let gamma_encoded_img = Bimage.Image.map_inplace gamma image in
+      match Bimage_unix.Stb.write output gamma_encoded_img with
+      | Ok () -> ()
+      | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other)
+    in
     let i =
       Integrator.create
         ~width
         ~height
-        ~write_pixel
+        ~image
         ~max_bounces
         ~samples_per_pixel
         ~intersect:Scene.intersect
@@ -130,7 +87,7 @@ struct
       if no_progress
       then Integrator.render i ~update_progress:ignore
       else begin
-        let total = width * height * samples_per_pixel in
+        let total = width * height in
         let p =
           let open Progress.Line in
           list
@@ -150,7 +107,7 @@ struct
       end
     in
     let elapsed, () = with_elapsed_time render in
-    Film.save_exn film;
+    save_exn ();
     printf "rendered in: %.3f ms\n" (Float.of_int63 elapsed *. 1e-6)
   ;;
 end

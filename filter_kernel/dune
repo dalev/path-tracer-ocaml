@@ -1,3 +1,4 @@
 (library
+ (public_name filter_kernel)
  (name filter_kernel)
  (libraries base fmt num))

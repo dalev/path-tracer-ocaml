@@ -1,9 +1,10 @@
 type t
+type image = (float, Bigarray.float64_elt, [ `Rgb ]) Bimage.Image.t
 
 val create
   :  width:int
   -> height:int
-  -> write_pixel:(x:int -> y:int -> Color.t -> unit)
+  -> image:image
   -> samples_per_pixel:int
   -> max_bounces:int
   -> camera:Camera.t

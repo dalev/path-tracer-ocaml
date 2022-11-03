@@ -37,6 +37,13 @@
    (>= 4.14))))
 
 (package
+ (name filter_kernel)
+ (synopsis "filter kernel")
+ (depends
+  (base
+   (>= v0.15.2))))
+
+(package
  (name low_discrepancy_sequence)
  (synopsis "a low-discrepancy point sequence in N-dimensions")
  (depends

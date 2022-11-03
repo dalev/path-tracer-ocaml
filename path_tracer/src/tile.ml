@@ -7,7 +7,9 @@ type t =
   ; height : int
   }
 
-let area t = t.width * t.height
+let width t = t.width
+let height t = t.height
+let area t = width t * height t
 
 let split_width t =
   let half_w = t.width / 2 in
@@ -55,12 +57,22 @@ let iter_local t ~f =
   done
 ;;
 
-let iter t ~f =
+let iter_global t ~f =
   let x0 = t.col in
   let y0 = t.row in
   for y = y0 to y0 + t.height - 1 do
     for x = x0 to x0 + t.width - 1 do
       f ~x ~y
+    done
+  done
+;;
+
+let iter t ~f =
+  for local_y = 0 to t.height - 1 do
+    let global_y = local_y + t.row in
+    for local_x = 0 to t.width - 1 do
+      let global_x = local_x + t.col in
+      f ~local_x ~local_y ~global_x ~global_y
     done
   done
 ;;

@@ -1,10 +1,13 @@
 open! Base
 module L = Low_discrepancy_sequence
+module Image = Bimage.Image
+
+type image = (float, Bigarray.float64_elt, [ `Rgb ]) Image.t
 
 type t =
   { width : int
   ; height : int
-  ; write_pixel : x:int -> y:int -> Color.t -> unit
+  ; image : image
   ; samples_per_pixel : int
   ; max_bounces : int
   ; trace_path : cx:float -> cy:float -> sample:(dimension:int -> float) -> Color.t
@@ -68,7 +71,7 @@ let path_tracer ~intersect ~background ~diffuse_plus_light ~camera ~max_bounces 
 let create
   ~width
   ~height
-  ~write_pixel
+  ~image
   ~samples_per_pixel
   ~max_bounces
   ~camera
@@ -80,32 +83,109 @@ let create
     Staged.unstage
     @@ path_tracer ~intersect ~background ~diffuse_plus_light ~camera ~max_bounces
   in
-  { width; height; write_pixel; samples_per_pixel; max_bounces; trace_path }
+  { width; height; image; samples_per_pixel; max_bounces; trace_path }
 ;;
 
 let create_sampler t = L.create ~dimension:(2 + (2 * t.max_bounces))
 
-let render ~update_progress t =
+module Film_tile = struct
+  type t =
+    { tile : Tile.t
+    ; pixels : image
+    ; filter_kernel : Filter_kernel.t
+    }
+
+  let border t = Filter_kernel.pixel_radius t.filter_kernel
+
+  let create tile ~filter_kernel =
+    let border = Filter_kernel.pixel_radius filter_kernel in
+    let width = Tile.width tile + (2 * border)
+    and height = Tile.height tile + (2 * border) in
+    let pixels = Image.v Bimage.f64 Bimage.rgb width height in
+    { tile; pixels; filter_kernel }
+  ;;
+
+  let write_pixel t ~x ~y color =
+    let border = border t in
+    let x = x + border
+    and y = y + border in
+    Filter_kernel.iter t.filter_kernel ~f:(fun ~dx ~dy weight ->
+      let x = x + dx
+      and y = y + dy in
+      let incr ch v =
+        let a = Image.get t.pixels x y ch in
+        Image.set t.pixels x y ch (Caml.Float.fma weight v a)
+      in
+      let r, g, b = Color.to_rgb color in
+      incr 0 r;
+      incr 1 g;
+      incr 2 b)
+  ;;
+
+  let iter t ~f =
+    let tile = t.tile in
+    let border = border t in
+    for local_y = 0 to t.pixels.Image.height - 1 do
+      let global_y = local_y + tile.Tile.row - border in
+      for local_x = 0 to t.pixels.Image.width - 1 do
+        let global_x = local_x + tile.Tile.col - border in
+        let img_ref = Image.get t.pixels local_x local_y in
+        let r = img_ref 0
+        and g = img_ref 1
+        and b = img_ref 2 in
+        f ~global_x ~global_y (Color.create ~r ~g ~b)
+      done
+    done
+  ;;
+end
+
+let render_tile t tile filter_kernel =
   let widthf = 1 // t.width in
   let heightf = 1 // t.height in
+  let ft = Film_tile.create tile ~filter_kernel in
   let lds = create_sampler t in
   for pass = 0 to t.samples_per_pixel - 1 do
-    let offset' = ref pass in
-    for y = 0 to t.height - 1 do
-      let yf = Float.of_int (t.height - 1 - y) in
-      for x = 0 to t.width - 1 do
-        let xf = Float.of_int x in
-        let offset = !offset' in
-        offset' := offset + t.samples_per_pixel;
-        let sample ~dimension = L.get lds ~offset ~dimension in
-        let dx = sample ~dimension:0
-        and dy = sample ~dimension:1 in
-        let cx = (xf +. dx) *. widthf in
-        let cy = (yf +. dy) *. heightf in
-        let color = t.trace_path ~cx ~cy ~sample in
-        t.write_pixel ~x ~y color
-      done;
-      update_progress t.width
-    done
-  done
+    let offset =
+      (pass * t.width * t.height) + (tile.Tile.row * t.width) + tile.Tile.col
+    in
+    let sample ~dimension = L.get lds ~offset ~dimension in
+    Tile.iter tile ~f:(fun ~local_x ~local_y ~global_x ~global_y ->
+      let xf = Float.of_int global_x
+      and yf = Float.of_int global_y
+      and dx = sample ~dimension:0
+      and dy = sample ~dimension:1 in
+      let cx = (xf +. dx) *. widthf
+      and cy = 1.0 -. ((yf +. dy) *. heightf) in
+      let color = t.trace_path ~cx ~cy ~sample in
+      Film_tile.write_pixel ft ~x:local_x ~y:local_y color)
+  done;
+  ft
+;;
+
+let stitch_tile img film_tile =
+  let in_bounds x y = 0 <= x && x < img.Image.width && 0 <= y && y < img.Image.height in
+  Film_tile.iter film_tile ~f:(fun ~global_x ~global_y color ->
+    if in_bounds global_x global_y
+    then begin
+      let incr ch v =
+        let a = Image.get img global_x global_y ch in
+        Image.set img global_x global_y ch (v +. a)
+      in
+      let r, g, b = Color.to_rgb color in
+      incr 0 r;
+      incr 1 g;
+      incr 2 b
+    end)
+;;
+
+let render ~update_progress t =
+  let tiles =
+    Tile.create ~width:t.width ~height:t.height |> Tile.split ~max_area:(32 * 32)
+  in
+  let pixel_radius = 1 in
+  let filter_kernel = Filter_kernel.Binomial.create ~order:5 ~pixel_radius in
+  List.iter tiles ~f:(fun tile ->
+    let ft = render_tile t tile filter_kernel in
+    stitch_tile t.image ft;
+    update_progress @@ Tile.area tile)
 ;;

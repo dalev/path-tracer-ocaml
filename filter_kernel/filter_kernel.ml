@@ -9,6 +9,8 @@ type t =
   ; data : FArray.t
   }
 
+let pixel_radius t = t.pixel_radius
+
 let iter t ~f =
   let r = t.pixel_radius in
   let i = ref 0 in
@@ -39,9 +41,9 @@ module Binomial = struct
     let order = FArray.length v in
     assert (order = FArray.length w);
     FArray.init (order * order) ~f:(fun j ->
-        let r = j / order
-        and c = j % order in
-        v.%{r} *. w.%{c})
+      let r = j / order
+      and c = j % order in
+      v.%{r} *. w.%{c})
   ;;
 
   let create ~order ~pixel_radius =
@@ -58,24 +60,24 @@ module Binomial = struct
         mod_num n one
       in
       FArray.init f_width ~f:(fun i ->
-          let i' = num_of_int i */ ratio in
-          let j' = i' +/ ratio in
-          let beg' = floor_num i' in
-          let beg = int_of_num beg' in
-          let end_ = ceiling_num j' in
-          let len = int_of_num end_ - beg in
-          let sum = ref zero in
-          for k = 0 to len - 1 do
-            let weight : Num.num =
-              if k = 0
-              then one -/ fractional_part i'
-              else if k = len - 1
-              then one -/ (end_ -/ j')
-              else Num.num_of_int 1
-            in
-            sum := !sum +/ (weight */ num_of_int coeffs.(k + beg))
-          done;
-          float_of_num !sum)
+        let i' = num_of_int i */ ratio in
+        let j' = i' +/ ratio in
+        let beg' = floor_num i' in
+        let beg = int_of_num beg' in
+        let end_ = ceiling_num j' in
+        let len = int_of_num end_ - beg in
+        let sum = ref zero in
+        for k = 0 to len - 1 do
+          let weight : Num.num =
+            if k = 0
+            then one -/ fractional_part i'
+            else if k = len - 1
+            then one -/ (end_ -/ j')
+            else Num.num_of_int 1
+          in
+          sum := !sum +/ (weight */ num_of_int coeffs.(k + beg))
+        done;
+        float_of_num !sum)
     in
     let total_weight = FArray.fold_left ~f:( +. ) ~init:0.0 w in
     let w = FArray.map ~f:(fun f -> f /. total_weight) w in

@@ -1,6 +1,7 @@
 type t
 
 val iter : t -> f:(dx:int -> dy:int -> float -> unit) -> unit
+val pixel_radius : t -> int
 
 module Binomial : sig
   val pow_falling : int -> int -> int
