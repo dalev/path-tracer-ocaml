@@ -3,6 +3,7 @@ open Stdio
 open Ply_format
 module Bigstring = Base_bigstring
 module FArray = Caml.Float.Array
+module Unix = Core_unix
 
 type p3 = float * float * float [@@deriving sexp_of]
 
@@ -52,18 +53,40 @@ let main ply =
        Hashtbl.iteri h ~f:(fun ~key:size ~data:count -> printf "%d-gons: %d\n" size count))
 ;;
 
+let channel_to_bigstring ic =
+  let module Bigbuffer = Core.Bigbuffer in
+  let megabyte = Int.pow 2 20 in
+  let dst = Bigbuffer.create megabyte in
+  let buf = Bytes.create megabyte in
+  let continue = ref true in
+  while !continue do
+    let n_read = In_channel.input ic ~buf ~pos:0 ~len:megabyte in
+    if n_read > 0
+    then Bigbuffer.add_subbytes dst buf ~pos:0 ~len:n_read
+    else continue := false
+  done;
+  Bigbuffer.big_contents dst
+;;
+
 let () =
   let start = Time_now.nanoseconds_since_unix_epoch () in
   let argv = Sys.get_argv () in
   if Array.length argv <> 2 then failwith "expected argument: path to .ply file";
-  let shared = false in
-  let fd = Unix.openfile argv.(1) [ Unix.O_RDONLY ] 0o600 in
-  let (bs : Bigstring.t) =
-    Bigarray.array1_of_genarray
-    @@ Unix.map_file fd Bigarray.char Bigarray.c_layout shared [| -1 |]
+  let bs, finish =
+    match argv.(1) with
+    | "-" -> channel_to_bigstring In_channel.stdin, fun () -> ()
+    | _ ->
+      let shared = false in
+      let fd = Unix.openfile argv.(1) ~mode:[ Unix.O_RDONLY ] ~perm:0o600 in
+      let bs =
+        Bigarray.array1_of_genarray
+        @@ Unix.map_file fd Bigarray.char Bigarray.c_layout ~shared [| -1 |]
+      in
+      let finish () = Unix.close fd in
+      bs, finish
   in
   let ply = Ply.of_bigstring bs in
-  Unix.close fd;
+  finish ();
   main (Or_error.ok_exn ply);
   let elapsed_ns =
     Float.of_int63 @@ Int63.O.(Time_now.nanoseconds_since_unix_epoch () - start)
