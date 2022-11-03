@@ -31,7 +31,7 @@ let sphere_intersect s ray =
 ;;
 
 let () =
-  Core.Command.run
+  Command_unix.run
     (Bench.make_command
        [ Bench.Test.create_group
            ~name:"bbox-intersect"
@@ -43,16 +43,16 @@ let () =
            (let pt_in = P3.create ~x:0.5 ~y:0.5 ~z:0.5 in
             let pt_out = P3.create ~x:2.0 ~y:(-0.5) ~z:0.0 in
             [ Bench.Test.create ~name:"inside" (fun () ->
-                  assert (bbox_mem unit_bbox pt_in))
+                assert (bbox_mem unit_bbox pt_in))
             ; Bench.Test.create ~name:"outside" (fun () ->
-                  assert (not (bbox_mem unit_bbox pt_out)))
+                assert (not (bbox_mem unit_bbox pt_out)))
             ])
        ; Bench.Test.create_group
            ~name:"sphere-intersect"
            [ Bench.Test.create ~name:"hit" (fun () ->
-                 assert (sphere_intersect unit_sphere ray_hit))
+               assert (sphere_intersect unit_sphere ray_hit))
            ; Bench.Test.create ~name:"miss" (fun () ->
-                 assert (not (sphere_intersect unit_sphere ray_miss)))
+               assert (not (sphere_intersect unit_sphere ray_miss)))
            ]
        ])
 ;;

@@ -1,3 +1,0 @@
-(executable
- (name intersect_bench)
- (libraries path_tracer sphere core_bench))
