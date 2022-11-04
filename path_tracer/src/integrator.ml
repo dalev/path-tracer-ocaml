@@ -126,7 +126,7 @@ let stitch_tile img film_tile =
 ;;
 
 let render ~update_progress t =
-  let max_area = 128 * 128 in
+  let max_area = Int.pow 32 2 in
   let tiles = Tile.create ~width:t.width ~height:t.height |> Tile.split ~max_area in
   let pixel_radius = 1 in
   let filter_kernel = Filter_kernel.Binomial.create ~order:5 ~pixel_radius in
