@@ -88,68 +88,15 @@ let create
 
 let create_sampler t = L.create ~dimension:(2 + (2 * t.max_bounces))
 
-module Film_tile = struct
-  type t =
-    { tile : Tile.t
-    ; pixels : image
-    ; filter_kernel : Filter_kernel.t
-    }
-
-  let border t = Filter_kernel.pixel_radius t.filter_kernel
-
-  let create tile ~filter_kernel =
-    let border = Filter_kernel.pixel_radius filter_kernel in
-    let width = Tile.width tile + (2 * border)
-    and height = Tile.height tile + (2 * border) in
-    let pixels = Image.v Bimage.f64 Bimage.rgb width height in
-    { tile; pixels; filter_kernel }
-  ;;
-
-  let write_pixel t ~x ~y color =
-    let border = border t in
-    let x = x + border
-    and y = y + border in
-    Filter_kernel.iter t.filter_kernel ~f:(fun ~dx ~dy weight ->
-      let x = x + dx
-      and y = y + dy in
-      let incr ch v =
-        let a = Image.get t.pixels x y ch in
-        Image.set t.pixels x y ch (Caml.Float.fma weight v a)
-      in
-      let r, g, b = Color.to_rgb color in
-      incr 0 r;
-      incr 1 g;
-      incr 2 b)
-  ;;
-
-  let iter t ~f =
-    let tile = t.tile in
-    let border = border t in
-    for local_y = 0 to t.pixels.Image.height - 1 do
-      let global_y = local_y + tile.Tile.row - border in
-      for local_x = 0 to t.pixels.Image.width - 1 do
-        let global_x = local_x + tile.Tile.col - border in
-        let img_ref = Image.get t.pixels local_x local_y in
-        let r = img_ref 0
-        and g = img_ref 1
-        and b = img_ref 2 in
-        f ~global_x ~global_y (Color.create ~r ~g ~b)
-      done
-    done
-  ;;
-end
-
 let render_tile t tile filter_kernel =
   let widthf = 1 // t.width in
   let heightf = 1 // t.height in
   let ft = Film_tile.create tile ~filter_kernel in
   let lds = create_sampler t in
   for pass = 0 to t.samples_per_pixel - 1 do
-    let offset =
-      (pass * t.width * t.height) + (tile.Tile.row * t.width) + tile.Tile.col
-    in
-    let sample ~dimension = L.get lds ~offset ~dimension in
     Tile.iter tile ~f:(fun ~local_x ~local_y ~global_x ~global_y ->
+      let offset = (global_y * t.width) + global_x + (pass * t.samples_per_pixel) in
+      let sample ~dimension = L.get lds ~offset ~dimension in
       let xf = Float.of_int global_x
       and yf = Float.of_int global_y
       and dx = sample ~dimension:0
@@ -179,9 +126,8 @@ let stitch_tile img film_tile =
 ;;
 
 let render ~update_progress t =
-  let tiles =
-    Tile.create ~width:t.width ~height:t.height |> Tile.split ~max_area:(32 * 32)
-  in
+  let max_area = 128 * 128 in
+  let tiles = Tile.create ~width:t.width ~height:t.height |> Tile.split ~max_area in
   let pixel_radius = 1 in
   let filter_kernel = Filter_kernel.Binomial.create ~order:5 ~pixel_radius in
   List.iter tiles ~f:(fun tile ->

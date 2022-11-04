@@ -1,3 +1,5 @@
 (test
  (name path_tracer_test)
- (libraries path_tracer alcotest))
+ (libraries path_tracer alcotest base fmt)
+ (preprocess
+  (pps ppx_base)))

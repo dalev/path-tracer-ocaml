@@ -39,6 +39,7 @@ let split t ~max_area =
 ;;
 
 let create ~width ~height = { row = 0; col = 0; width; height }
+let create' ~width ~height ~row ~col = { row; col; width; height }
 
 let extend t ~radius =
   assert (radius > 0);
@@ -75,4 +76,11 @@ let iter t ~f =
       f ~local_x ~local_y ~global_x ~global_y
     done
   done
+;;
+
+let fold t ~init ~f =
+  let acc = ref init in
+  iter t ~f:(fun ~local_x ~local_y ~global_x ~global_y ->
+    acc := f ~local_x ~local_y ~global_x ~global_y !acc);
+  !acc
 ;;

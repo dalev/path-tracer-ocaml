@@ -6,6 +6,7 @@ type t = private
   }
 
 val create : width:int -> height:int -> t
+val create' : width:int -> height:int -> row:int -> col:int -> t
 val width : t -> int
 val height : t -> int
 val extend : t -> radius:int -> t
@@ -23,3 +24,9 @@ val iter
   :  t
   -> f:(local_x:int -> local_y:int -> global_x:int -> global_y:int -> unit)
   -> unit
+
+val fold
+  :  t
+  -> init:'a
+  -> f:(local_x:int -> local_y:int -> global_x:int -> global_y:int -> 'a -> 'a)
+  -> 'a
