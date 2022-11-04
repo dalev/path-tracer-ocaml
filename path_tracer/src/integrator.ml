@@ -126,12 +126,26 @@ let stitch_tile img film_tile =
 ;;
 
 let render ~update_progress t =
+  let open Domainslib in
   let max_area = Int.pow 32 2 in
   let tiles = Tile.create ~width:t.width ~height:t.height |> Tile.split ~max_area in
   let pixel_radius = 1 in
   let filter_kernel = Filter_kernel.Binomial.create ~order:5 ~pixel_radius in
-  List.iter tiles ~f:(fun tile ->
-    let ft = render_tile t tile filter_kernel in
-    stitch_tile t.image ft;
-    update_progress @@ Tile.area tile)
+  let c = Chan.make_unbounded () in
+  let pool =
+    let num_domains = Caml.Domain.recommended_domain_count () in
+    Task.setup_pool ~num_domains ()
+  in
+  Task.run pool (fun () ->
+    List.iter tiles ~f:(fun tile ->
+      ignore
+      @@ Task.async pool (fun () ->
+           let ft = render_tile t tile filter_kernel in
+           Chan.send c ft));
+    for _i = 0 to List.length tiles - 1 do
+      let ft = Chan.recv c in
+      stitch_tile t.image ft;
+      update_progress @@ Tile.area (Film_tile.tile ft)
+    done);
+  Task.teardown_pool pool
 ;;

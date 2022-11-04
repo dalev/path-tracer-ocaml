@@ -10,6 +10,7 @@ type t =
   }
 
 let border t = Filter_kernel.pixel_radius t.filter_kernel
+let tile t = t.tile
 
 let create tile ~filter_kernel =
   let border = Filter_kernel.pixel_radius filter_kernel in
