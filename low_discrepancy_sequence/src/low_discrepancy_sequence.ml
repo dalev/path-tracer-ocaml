@@ -16,8 +16,8 @@ let phi_approx d =
   loop 2.0
 ;;
 
-let fractional x = x -. Float.trunc x
-let clamp x = fractional (0.5 +. x)
+let[@inline] fractional x = x -. Float.trunc x
+let[@inline] clamp x = fractional (0.5 +. x)
 
 let alpha dimension =
   let phi = phi_approx dimension in

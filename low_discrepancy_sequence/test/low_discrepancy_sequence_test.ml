@@ -26,35 +26,32 @@ let check_float ~within =
 ;;
 
 let () =
-  let test_case = Alcotest.test_case in
+  let test_case name f = Alcotest.test_case name `Quick f in
   Alcotest.run
     "low_discrepancy_sequence"
     [ ( "scale-sample"
       , let scale_sample s = scale_sample s ~lower:(-2.0) ~upper:3.0 in
         let within = 1e-3 in
-        [ test_case "scale_sample 0 -> lower" `Quick (fun () ->
-              check_float ~within (-2.0) (scale_sample 0.0))
-        ; test_case "scale_sample 1 -> upper" `Quick (fun () ->
-              check_float ~within 3.0 (scale_sample 1.0))
+        [ test_case "scale_sample 0 -> lower" (fun () ->
+            check_float ~within (-2.0) (scale_sample 0.0))
+        ; test_case "scale_sample 1 -> upper" (fun () ->
+            check_float ~within 3.0 (scale_sample 1.0))
         ] )
     ; ( "1D-integrals"
-      , [ test_case "sin(x) from 0 to pi = 2" `Quick (fun () ->
-              check_float
-                ~within:1e-3
-                2.0
-                (integrate_1d sin 0.0 Float.pi ~iterations:1_000))
-        ; test_case "sin(x) from -1 to 1 = 0" `Quick (fun () ->
-              check_float ~within:1e-3 0.0 (integrate_1d sin (-1.0) 1.0 ~iterations:5_000))
-        ; test_case "quarter circle = pi/4" `Quick (fun () ->
-              check_float
-                ~within:1e-3
-                (Float.pi /. 4.0)
-                (integrate_1d (fun x -> sqrt (1.0 -. (x *. x))) 0.0 1.0 ~iterations:2_000))
-        ; test_case "exp(x) from 0 to 3 = e^3 - 1" `Quick (fun () ->
-              check_float
-                ~within:0.03
-                (Float.expm1 3.0)
-                (integrate_1d Float.exp 0.0 3.0 ~iterations:2_000))
+      , [ test_case "sin(x) from 0 to pi = 2" (fun () ->
+            check_float ~within:1e-3 2.0 (integrate_1d sin 0.0 Float.pi ~iterations:1_000))
+        ; test_case "sin(x) from -1 to 1 = 0" (fun () ->
+            check_float ~within:1e-3 0.0 (integrate_1d sin (-1.0) 1.0 ~iterations:5_000))
+        ; test_case "quarter circle = pi/4" (fun () ->
+            check_float
+              ~within:1e-3
+              (Float.pi /. 4.0)
+              (integrate_1d (fun x -> sqrt (1.0 -. (x *. x))) 0.0 1.0 ~iterations:2_000))
+        ; test_case "exp(x) from 0 to 3 = e^3 - 1" (fun () ->
+            check_float
+              ~within:0.03
+              (Float.expm1 3.0)
+              (integrate_1d Float.exp 0.0 3.0 ~iterations:2_000))
         ] )
     ]
 ;;
