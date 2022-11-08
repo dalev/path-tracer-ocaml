@@ -1,6 +1,10 @@
 (data_only_dirs sphere-intersect-rs)
 
 (env
+ (dev
+  (ocamlopt_flags
+   ;; inline annotations may fail without optimization
+   (:standard -warn-error -55)))
  (release
   (ocamlopt_flags
-   (:standard -O3))))
+   (:standard -O3 -warn-error +a))))

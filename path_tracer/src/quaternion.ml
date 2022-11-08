@@ -26,12 +26,12 @@ let mul { r; v } { r = r'; v = v' } =
   let r'' = (r *. r') -. V3.dot v v' in
   let v'' =
     let open V3.Infix in
-    V3.cross v v' + V3.scale v' r + V3.scale v r'
+    (V3.cross [@inlined]) v v' + V3.scale v' r + V3.scale v r'
   in
   { r = r''; v = v'' }
 ;;
 
-let[@inline] conj (t : t) : t =
+let[@inline always] conj (t : t) : t =
   let open V3.Infix in
   { t with v = ~-(t.v) }
 ;;

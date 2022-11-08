@@ -28,7 +28,7 @@ let rotate t v = Quaternion.transform t.rotation v
 
 let rotate_inv t v =
   let q' = Quaternion.conj t.rotation in
-  Quaternion.transform q' v
+  (Quaternion.transform [@inlined]) q' v
 ;;
 
 let reflect (_ : t) v =
@@ -64,6 +64,6 @@ let unit_square_to_hemisphere u v =
 ;;
 
 let omega_i t ray =
-  let world_dir = V3.Infix.( ~- ) (V3.normalize (Ray.direction ray)) in
+  let world_dir = V3.Infix.( ~- ) ((V3.normalize [@inlined]) (Ray.direction ray)) in
   rotate t world_dir
 ;;
