@@ -32,7 +32,7 @@ let sphere_intersect s ray =
 
 let () =
   Command_unix.run
-    (Bench.make_command
+  @@ Bench.make_command
        [ Bench.Test.create_group
            ~name:"bbox-intersect"
            [ Bench.Test.create ~name:"hit" (fun () -> assert (is_hit ray_hit))
@@ -54,5 +54,5 @@ let () =
            ; Bench.Test.create ~name:"miss" (fun () ->
                assert (not (sphere_intersect unit_sphere ray_miss)))
            ]
-       ])
+       ]
 ;;
