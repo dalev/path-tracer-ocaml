@@ -49,7 +49,7 @@ module V3 = struct
     let[@inline] ( ~- ) a = map ~f:( ~-. ) a
   end
 
-  let of_points ~src ~tgt = Infix.( - ) tgt src
+  let[@inline] of_points ~src ~tgt = Infix.( - ) tgt src
   let[@inline] fma u v w = map3 ~f:Caml.Float.fma u v w
 
   (* These two inlines are to avoid alloc in Bbox.is_hit *)

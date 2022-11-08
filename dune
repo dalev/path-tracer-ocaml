@@ -7,4 +7,7 @@
    (:standard -warn-error -55)))
  (release
   (ocamlopt_flags
-   (:standard -O3 -warn-error +a))))
+   (:standard -O3 -warn-error +a)))
+ (dumplambda
+  (ocamlopt_flags
+   (:standard -O3 -dump-dir dumps -dlambda -warn-error +a))))
