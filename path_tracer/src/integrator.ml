@@ -114,7 +114,7 @@ let stitch_tile img film_tile =
   Film_tile.iter film_tile ~f:(fun ~global_x ~global_y color ->
     if in_bounds global_x global_y
     then begin
-      let incr ch v =
+      let[@inline] incr ch v =
         let a = Image.get img global_x global_y ch in
         Image.set img global_x global_y ch (v +. a)
       in

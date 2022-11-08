@@ -27,7 +27,7 @@ let write_pixel t ~x ~y color =
   Filter_kernel.iter t.filter_kernel ~f:(fun ~dx ~dy weight ->
     let x = x + dx
     and y = y + dy in
-    let incr ch v =
+    let[@inline] incr ch v =
       let a = Image.get t.pixels x y ch in
       Image.set t.pixels x y ch (Caml.Float.fma weight v a)
     in

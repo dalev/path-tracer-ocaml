@@ -218,6 +218,7 @@ module Simd_leaf : Leaf_S = struct
 end
 
 let main { Args.common; no_simd } =
+  printf "\nminor heap size = %d\n" (Caml.Gc.get ()).Caml.Gc.minor_heap_size;
   let { Common_args.width; height; _ } = common in
   let leaf =
     if no_simd then (module Array_leaf : Leaf_S) else (module Simd_leaf : Leaf_S)
