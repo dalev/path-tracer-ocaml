@@ -16,23 +16,23 @@
   (time_now
    (>= v0.15.0))
   (core
-   (>= v0.15.0))
+   (>= v0.15.1))
   (stdio
    (>= v0.15.0))
   (progress
    (>= 0.2.1))
   (ppx_base
-   (>= v0.15.0))
+   (>= v0.15.1))
   (bimage-unix
-   (>= 0.5.0))
+   (>= 0.6.0))
   (bimage
-   (>= 0.5.0))
+   (>= 0.6.0))
   (alcotest
    (and
     :with-test
-    (>= 1.5)))
+    (>= 1.6)))
   (base
-   (>= 0.15.0))
+   (>= 0.15.1))
   (ocaml
    (>= 4.14))))
 
@@ -41,7 +41,7 @@
  (synopsis "filter kernel")
  (depends
   (base
-   (>= v0.15.2))))
+   (>= v0.15.1))))
 
 (package
  (name low_discrepancy_sequence)
@@ -60,7 +60,7 @@
  (depends
   (alcotest
    (and
-    (>= 1.5.0)
+    (>= 1.6.0)
     :with-test))
   (core_kernel
    (>= v0.15.0))
@@ -75,7 +75,7 @@
   (base_bigstring
    (>= v0.15.0))
   (base
-   (>= v0.15.0))
+   (>= v0.15.1))
   (ocaml
    (>= 4.14))))
 

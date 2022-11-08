@@ -7,7 +7,7 @@ homepage: "https://github.com/dalev/path-tracer-ocaml"
 bug-reports: "https://github.com/dalev/path-tracer-ocaml/issues"
 depends: [
   "dune" {>= "3.0"}
-  "base" {>= "v0.15.2"}
+  "base" {>= "v0.15.1"}
   "odoc" {with-doc}
 ]
 build: [

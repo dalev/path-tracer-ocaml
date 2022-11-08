@@ -1,3 +1,9 @@
 (executable
  (name intersect_bench)
+ (modules intersect_bench)
  (libraries path_tracer sphere core_unix.command_unix core_bench))
+
+(executable
+ (name quaternion_bench)
+ (modules quaternion_bench)
+ (libraries path_tracer core_unix.command_unix core_bench))

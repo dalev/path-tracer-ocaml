@@ -8,14 +8,14 @@ bug-reports: "https://github.com/dalev/path-tracer-ocaml/issues"
 depends: [
   "dune" {>= "3.0"}
   "time_now" {>= "v0.15.0"}
-  "core" {>= "v0.15.0"}
+  "core" {>= "v0.15.1"}
   "stdio" {>= "v0.15.0"}
   "progress" {>= "0.2.1"}
-  "ppx_base" {>= "v0.15.0"}
-  "bimage-unix" {>= "0.5.0"}
-  "bimage" {>= "0.5.0"}
-  "alcotest" {with-test & >= "1.5"}
-  "base" {>= "0.15.0"}
+  "ppx_base" {>= "v0.15.1"}
+  "bimage-unix" {>= "0.6.0"}
+  "bimage" {>= "0.6.0"}
+  "alcotest" {with-test & >= "1.6"}
+  "base" {>= "0.15.1"}
   "ocaml" {>= "4.14"}
   "odoc" {with-doc}
 ]
