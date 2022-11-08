@@ -64,6 +64,6 @@ let unit_square_to_hemisphere u v =
 ;;
 
 let omega_i t ray =
-  let world_dir = V3.Infix.( ~- ) ((V3.normalize [@inlined]) (Ray.direction ray)) in
+  let world_dir = V3.Infix.( ~- ) (Ray.direction ray) in
   rotate t world_dir
 ;;

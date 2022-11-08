@@ -96,6 +96,7 @@ let ray t dx dy =
       ~x:(t.lower_left_x +. (t.view_x *. dx))
       ~y:(t.lower_left_y +. (t.view_y *. dy))
       ~z:(-1.0)
+    |> V3.normalize
   in
   Ray.create P3.origin dir
 ;;
