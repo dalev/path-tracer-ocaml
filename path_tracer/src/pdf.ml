@@ -7,8 +7,9 @@ let sample t (_ : Shader_space.t) u v =
   | Diffuse -> Shader_space.unit_square_to_hemisphere u v
 ;;
 
+(** [eval] assumes [dir] is normalized *)
 let eval t (dir : V3.t) (_ : Shader_space.t) =
-  let z = (V3.normalize dir).V3.z in
+  let z = dir.V3.z in
   match t with
   | Diffuse -> if Float.is_negative z then 0.0 else z /. Float.pi
 ;;

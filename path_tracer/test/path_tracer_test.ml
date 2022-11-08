@@ -129,4 +129,20 @@ let bbox_tests =
     ] )
 ;;
 
-let () = Alcotest.run "path_tracer" [ bbox_tests; tile_tests; film_tile_tests ]
+let shader_space_tests =
+  ( "shader_space"
+  , [ test_case "unit_square_to_hemisphere is normalized" (fun () ->
+        for _i = 0 to 100 do
+          let u = Random.float 1.0
+          and v = Random.float 1.0 in
+          let w = Shader_space.unit_square_to_hemisphere u v in
+          Alcotest.(check (float 1e-6) "within 1e-6") 1.0 (V3.quadrance w)
+        done)
+    ] )
+;;
+
+let () =
+  Alcotest.run
+    "path_tracer"
+    [ bbox_tests; tile_tests; film_tile_tests; shader_space_tests ]
+;;
