@@ -31,12 +31,12 @@ let mul { r; v } { r = r'; v = v' } =
   { r = r''; v = v'' }
 ;;
 
-let conj (t : t) : t =
+let[@inline] conj (t : t) : t =
   let open V3.Infix in
   { t with v = ~-(t.v) }
 ;;
 
 let transform t v =
-  let q = mul (mul t { r = 0.0; v }) (conj t) in
+  let q = (mul [@inlined]) ((mul [@inlined]) t { r = 0.0; v }) (conj t) in
   q.v
 ;;

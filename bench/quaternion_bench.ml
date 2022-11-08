@@ -53,6 +53,11 @@ let shader_space =
         (let ss = random_ss ()
          and v = random_v () in
          fun () -> Sys.opaque_identity (S.rotate_inv ss v))
+    ; Bench.Test.create
+        ~name:"create"
+        (let p = random_p ()
+         and v = V3.normalize @@ random_v () in
+         fun () -> Sys.opaque_identity (S.create v p))
     ]
 ;;
 

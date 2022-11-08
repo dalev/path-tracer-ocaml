@@ -41,12 +41,12 @@ let[@inline] hit_range t ray ~t_min ~t_max =
   let invd = Ray.direction_inv ray in
   let o = Ray.origin ray in
   let[@inline] f p = V3.Infix.( * ) (P3.to_v3 P3.Infix.(p - o)) invd in
-  let t0' = f t.min in
-  let t1' = f t.max in
-  let t0 = V3.map2 ~f:Float.min t0' t1' in
-  let t1 = V3.map2 ~f:Float.max t0' t1' in
-  let t_min = Float.max t_min (V3.max_coord t0) in
-  let t_max = Float.min t_max (V3.min_coord t1) in
+  let t0' = f t.min
+  and t1' = f t.max in
+  let a = V3.max_coord @@ V3.map2 ~f:Float.min t0' t1'
+  and b = V3.min_coord @@ V3.map2 ~f:Float.max t0' t1' in
+  let t_min = Float.max t_min a
+  and t_max = Float.min t_max b in
   t_min, t_max
 ;;
 

@@ -43,8 +43,8 @@ module Bin = struct
     let bounds =
       Some
         (match t.bounds with
-        | None -> b_box
-        | Some t_box -> Bbox.union t_box b_box)
+         | None -> b_box
+         | Some t_box -> Bbox.union t_box b_box)
     in
     t.bounds <- bounds;
     t.count <- t.count + 1
@@ -143,7 +143,7 @@ module Proposal = struct
     match
       List.min_elt ~compare
       @@ List.filter_map Axis.all ~f:(fun axis ->
-             propose_split_one_axis ~num_bins shapes axis cbbox)
+           propose_split_one_axis ~num_bins shapes axis cbbox)
     with
     | v -> v
     | exception e -> Exn.reraisef e "shapes len = %d" (Slice.length shapes) ()
@@ -154,33 +154,28 @@ module Make (L : Leaf) = struct
   type leaf = L.t
 
   module Tree = struct
-    type t =
-      | Leaf of
-          { bbox : Bbox.t
-          ; leaf : leaf
-          }
+    type t' =
+      | Leaf of leaf
       | Branch of
           { axis : V3.t -> float
-          ; bbox : Bbox.t
           ; lhs : t
           ; rhs : t
           }
 
-    let bbox = function
-      | Leaf { bbox; _ } -> bbox
-      | Branch { bbox; _ } -> bbox
-    ;;
+    and t = Bbox.t * t'
+
+    let bbox : t -> Bbox.t = fst
 
     let rec cata t ~branch ~leaf =
-      match t with
-      | Leaf { leaf = l; _ } -> leaf l
+      match snd t with
+      | Leaf l -> leaf l
       | Branch { lhs; rhs; _ } -> branch (cata lhs ~branch ~leaf) (cata rhs ~branch ~leaf)
     ;;
 
     let iter_leaves t ~f = cata t ~branch:(fun () () -> ()) ~leaf:f
 
     let make_leaf bbox shapes =
-      Leaf { bbox; leaf = L.of_elts (Slice.to_array_map shapes ~f:Bshape.shape) }
+      bbox, Leaf (L.of_elts (Slice.to_array_map shapes ~f:Bshape.shape))
     ;;
 
     let create ~num_bins bbox shapes =
@@ -201,7 +196,7 @@ module Make (L : Leaf) = struct
               let lhs_box, rhs_box = Proposal.lhs_box p, Proposal.rhs_box p in
               let lhs = loop lhs_box l in
               let rhs = loop rhs_box r in
-              Branch { lhs; rhs; bbox; axis }))
+              bbox, Branch { lhs; rhs; axis }))
       in
       loop bbox shapes
     ;;
@@ -210,32 +205,32 @@ module Make (L : Leaf) = struct
       let dir = Ray.direction ray in
       let rec loop t ~t_min ~t_max =
         let open Float.O in
-        match t with
-        | Leaf { bbox; leaf = l } ->
-          let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
-          if t_min <= t_max then L.intersect l ray ~t_min ~t_max else None
-        | Branch { bbox; axis; lhs; rhs } ->
-          let t_min, t_max = Bbox.hit_range bbox ray ~t_min ~t_max in
-          if t_min > t_max
-          then None
-          else (
+        let t_min, t_max = Bbox.hit_range (bbox t) ray ~t_min ~t_max in
+        if t_min > t_max
+        then None
+        else begin
+          match snd t with
+          | Leaf l -> L.intersect l ray ~t_min ~t_max
+          | Branch { axis; lhs; rhs } ->
             let t1, t2 = if axis dir >= 0.0 then lhs, rhs else rhs, lhs in
-            match loop t1 ~t_min ~t_max with
-            | None -> loop t2 ~t_min ~t_max
-            | Some elt_hit as t1_result ->
-              let t_hit = L.elt_hit_t elt_hit in
-              (match loop t2 ~t_min ~t_max:t_hit with
-              | Some _ as t2_result -> t2_result
-              | None -> t1_result))
+            (match loop t1 ~t_min ~t_max with
+             | None -> loop t2 ~t_min ~t_max
+             | Some elt_hit as t1_result ->
+               let t_hit = L.elt_hit_t elt_hit in
+               (match loop t2 ~t_min ~t_max:t_hit with
+                | Some _ as t2_result -> t2_result
+                | None -> t1_result))
+        end
       in
       loop t ~t_min ~t_max
     ;;
 
     let fold_neighbors t point ~init ~f =
       let rec loop t acc k =
-        match t with
-        | Leaf { bbox; leaf } -> k @@ if Bbox.mem bbox point then f acc leaf else acc
-        | Branch { bbox; lhs; rhs; axis = _ } ->
+        let bbox = bbox t in
+        match snd t with
+        | Leaf leaf -> k @@ if Bbox.mem bbox point then f acc leaf else acc
+        | Branch { lhs; rhs; axis = _ } ->
           if Bbox.mem bbox point then loop lhs acc (fun acc -> loop rhs acc k) else k acc
       in
       loop t init Fn.id
@@ -252,8 +247,8 @@ module Make (L : Leaf) = struct
   let leaf_length_histogram t =
     let h = Hashtbl.create (module Int) in
     Tree.iter_leaves t.root ~f:(fun l ->
-        let len = L.length l in
-        Hashtbl.incr h len);
+      let len = L.length l in
+      Hashtbl.incr h len);
     h
   ;;
 

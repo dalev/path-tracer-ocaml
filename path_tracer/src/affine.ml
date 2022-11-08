@@ -68,7 +68,7 @@ module V3 = struct
   ;;
 
   let cross { x = a; y = b; z = c } { x = d; y = e; z = f } =
-    let h w x y z = Caml.Float.fma w x @@ Float.neg (y *. z) in
+    let[@inline] h w x y z = Caml.Float.fma w x @@ Float.neg (y *. z) in
     { x = h b f c e; y = h c d a f; z = h a e b d }
   ;;
 end
