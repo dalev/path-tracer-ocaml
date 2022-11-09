@@ -153,7 +153,7 @@ module Make (L : Leaf) = struct
     type t' =
       | Leaf of leaf
       | Branch of
-          { axis : V3.t -> float
+          { axis : bool * bool * bool -> bool
           ; lhs : t
           ; rhs : t
           }
@@ -186,17 +186,18 @@ module Make (L : Leaf) = struct
           then make_leaf bbox shapes
           else (
             let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
-            let axis = V3.axis @@ Proposal.axis p in
+            let axis = Proposal.axis p in
             let lhs_box, rhs_box = Proposal.lhs_box p, Proposal.rhs_box p in
             let lhs = loop lhs_box l in
             let rhs = loop rhs_box r in
-            bbox, Branch { lhs; rhs; axis })
+            bbox, Branch { lhs; rhs; axis = Axis.tuple_selector axis })
       in
       loop bbox shapes
     ;;
 
     let intersect t ray ~t_min ~t_max =
       let dir = Ray.direction ray in
+      let dirs = Float.O.(V3.x dir >= 0.0, V3.y dir >= 0.0, V3.z dir >= 0.0) in
       let rec loop t ~t_min ~t_max =
         let open Float.O in
         let t_min, t_max = Bbox.hit_range (bbox t) ray ~t_min ~t_max in
@@ -206,7 +207,7 @@ module Make (L : Leaf) = struct
           match snd t with
           | Leaf l -> L.intersect l ray ~t_min ~t_max
           | Branch { axis; lhs; rhs } ->
-            let t1, t2 = if axis dir >= 0.0 then lhs, rhs else rhs, lhs in
+            let t1, t2 = if axis dirs then lhs, rhs else rhs, lhs in
             (match loop t1 ~t_min ~t_max with
              | None -> loop t2 ~t_min ~t_max
              | Some elt_hit as t1_result ->
