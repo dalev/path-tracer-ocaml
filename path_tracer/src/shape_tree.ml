@@ -140,13 +140,9 @@ module Proposal = struct
 
   let create ~num_bins shapes =
     let cbbox = Bshape.centroid_bbox shapes in
-    match
-      List.min_elt ~compare
-      @@ List.filter_map Axis.all ~f:(fun axis ->
-           propose_split_one_axis ~num_bins shapes axis cbbox)
-    with
-    | v -> v
-    | exception e -> Exn.reraisef e "shapes len = %d" (Slice.length shapes) ()
+    List.min_elt ~compare
+    @@ List.filter_map Axis.all ~f:(fun axis ->
+         propose_split_one_axis ~num_bins shapes axis cbbox)
   ;;
 end
 
@@ -180,23 +176,21 @@ module Make (L : Leaf) = struct
 
     let create ~num_bins bbox shapes =
       let rec loop bbox shapes =
-        if Slice.length shapes <= L.length_cutoff
-        then make_leaf bbox shapes
-        else (
-          match Proposal.create ~num_bins shapes with
-          | None -> make_leaf bbox shapes
-          | Some p ->
-            let leaf_cost = Proposal.leaf_cost (Slice.length shapes) in
-            let open Float.O in
-            if Proposal.cost p > leaf_cost
-            then make_leaf bbox shapes
-            else (
-              let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
-              let axis = V3.axis @@ Proposal.axis p in
-              let lhs_box, rhs_box = Proposal.lhs_box p, Proposal.rhs_box p in
-              let lhs = loop lhs_box l in
-              let rhs = loop rhs_box r in
-              bbox, Branch { lhs; rhs; axis }))
+        match Proposal.create ~num_bins shapes with
+        | None -> make_leaf bbox shapes
+        | Some p ->
+          let leaf_cost = Proposal.leaf_cost (Slice.length shapes) in
+          if (Float.O.(Proposal.cost p >= leaf_cost)
+             && Slice.length shapes <= L.length_cutoff)
+             || Slice.length shapes <= 4
+          then make_leaf bbox shapes
+          else (
+            let l, r = Slice.partition_in_place shapes ~on_lhs:(Proposal.on_lhs p) in
+            let axis = V3.axis @@ Proposal.axis p in
+            let lhs_box, rhs_box = Proposal.lhs_box p, Proposal.rhs_box p in
+            let lhs = loop lhs_box l in
+            let rhs = loop rhs_box r in
+            bbox, Branch { lhs; rhs; axis })
       in
       loop bbox shapes
     ;;
