@@ -199,7 +199,6 @@ module Make (L : Leaf) = struct
       let dir = Ray.direction ray in
       let dirs = Float.O.(V3.x dir >= 0.0, V3.y dir >= 0.0, V3.z dir >= 0.0) in
       let rec loop t ~t_min ~t_max =
-        let open Float.O in
         if not @@ Bbox.is_hit (bbox t) ray ~t_min ~t_max
         then None
         else begin
