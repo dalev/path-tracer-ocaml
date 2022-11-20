@@ -3,18 +3,18 @@
 version = 3
 
 [[package]]
-name = "chlorine"
-version = "1.0.7"
+name = "cty"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd650552110e39b7c5058986cf177decd3365841836578ac50a286094eac0be6"
+checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
 
 [[package]]
 name = "ocaml-sys"
-version = "0.22.0"
+version = "0.22.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e8d1ec034dbef9fde8fd34a325b245f316c6dec5ab4f2512ba8cfd43564654a"
+checksum = "73ec6ca7d41458442627435afb8f4671e83fd642e8a560171d671a1f679aa3cf"
 dependencies = [
- "chlorine",
+ "cty",
 ]
 
 [[package]]
