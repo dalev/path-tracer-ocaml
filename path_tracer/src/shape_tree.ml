@@ -197,6 +197,7 @@ module Make (L : Leaf) = struct
 
     let intersect t ray ~t_min ~t_max =
       let dir = Ray.direction ray in
+      (* caching these comparisons outside [loop] prevents a ton of float allocation *)
       let dirs = Float.O.(V3.x dir >= 0.0, V3.y dir >= 0.0, V3.z dir >= 0.0) in
       let rec loop t ~t_min ~t_max =
         if not @@ Bbox.is_hit (bbox t) ray ~t_min ~t_max
