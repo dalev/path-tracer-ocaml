@@ -16,7 +16,7 @@ depends: [
   "bimage" {>= "0.6.0"}
   "alcotest" {with-test & >= "1.6"}
   "base" {>= "0.15.1"}
-  "ocaml" {>= "4.14"}
+  "ocaml" {>= "5.0.0~beta1"}
   "odoc" {with-doc}
 ]
 build: [

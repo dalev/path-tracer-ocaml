@@ -34,7 +34,7 @@
   (base
    (>= 0.15.1))
   (ocaml
-   (>= 4.14))))
+   (>= 5.0.0~beta1))))
 
 (package
  (name filter_kernel)
@@ -52,7 +52,7 @@
     :with-test
     (>= 1.5)))
   (ocaml
-   (>= 4.14))))
+   (>= 5.0.0~beta1))))
 
 (package
  (name ply_format)
@@ -77,6 +77,6 @@
   (base
    (>= v0.15.1))
   (ocaml
-   (>= 4.14))))
+   (>= 5.0.0~beta1))))
 
 (generate_opam_files true)

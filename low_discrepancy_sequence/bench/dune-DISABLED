@@ -1,3 +1,0 @@
-(executable
- (name low_discrepancy_sequence_bench)
- (libraries low_discrepancy_sequence core_bench))
