@@ -12,4 +12,4 @@ panic = "abort"
 lto = true
 
 [dependencies]
-ocaml-sys = "0.22"
+ocaml-sys = "0.23"
