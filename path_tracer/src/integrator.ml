@@ -133,7 +133,7 @@ let render ~update_progress t =
   let filter_kernel = Filter_kernel.Binomial.create ~order:5 ~pixel_radius in
   let c = Chan.make_unbounded () in
   let pool =
-    let num_domains = Caml.Domain.recommended_domain_count () in
+    let num_domains = Caml.Domain.recommended_domain_count () - 1 in
     Task.setup_pool ~num_domains ()
   in
   Task.run pool (fun () ->
