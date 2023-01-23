@@ -37,6 +37,13 @@ let write_pixel t ~x ~y color =
     incr 2 b)
 ;;
 
+let write_sample t ~x ~y color =
+  (* TODO: use a proper gaussian filter *)
+  let x = Float.to_int x
+  and y = Float.to_int y in
+  write_pixel t ~x ~y color
+;;
+
 let iter t ~f =
   let tile = t.tile in
   let border = border t in

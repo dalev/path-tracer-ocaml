@@ -64,10 +64,7 @@ struct
   let run { Args.width; height; max_bounces; samples_per_pixel; no_progress; output } =
     let image = Image.v Bimage.f64 Bimage.rgb width height in
     let save_exn () =
-      let spp_inv = 1 // samples_per_pixel in
-      let gamma f = Float.sqrt (f *. spp_inv) in
-      let gamma_encoded_img = Bimage.Image.map_inplace gamma image in
-      match Bimage_unix.Stb.write output gamma_encoded_img with
+      match Bimage_unix.Stb.write output image with
       | Ok () -> ()
       | Error (#Bimage.Error.t as other) -> Bimage.Error.unwrap (Error other)
     in

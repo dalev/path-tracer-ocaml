@@ -104,7 +104,9 @@ let render_tile t tile filter_kernel =
       let cx = (xf +. dx) *. widthf
       and cy = 1.0 -. ((yf +. dy) *. heightf) in
       let color = t.trace_path ~cx ~cy ~sample in
-      Film_tile.write_pixel ft ~x:local_x ~y:local_y color)
+      let x = Float.of_int local_x +. dx
+      and y = Float.of_int local_y +. dy in
+      Film_tile.write_sample ft ~x ~y color)
   done;
   ft
 ;;
@@ -147,5 +149,8 @@ let render ~update_progress t =
       stitch_tile t.image ft;
       update_progress @@ Tile.area (Film_tile.tile ft)
     done);
+  let spp_inv = 1 // t.samples_per_pixel in
+  let gamma f = Float.sqrt (f *. spp_inv) in
+  let _ = Bimage.Image.map_inplace gamma t.image in
   Task.teardown_pool pool
 ;;
