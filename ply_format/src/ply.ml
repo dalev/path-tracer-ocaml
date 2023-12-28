@@ -153,7 +153,7 @@ module Property = struct
       | Rows of row array
 
     let sexp_of_t = function
-      | Floats fs -> [%message "floatarray" ~length:(Caml.Float.Array.length fs : int)]
+      | Floats fs -> [%message "floatarray" ~length:(Stdlib.Float.Array.length fs : int)]
       | Ints is -> [%message "int array" ~length:(Array.length is : int)]
       | Rows rs -> [%message "row array" ~length:(Array.length rs : int)]
     ;;
@@ -171,12 +171,12 @@ module Property = struct
         (match (type_ : Type.t) with
         | Float | Double ->
           let get_float = Type.float_accessor_exn type_ in
-          let a = Caml.Float.Array.create len in
+          let a = Stdlib.Float.Array.create len in
           let extract ic ~row_start i =
             let base = Input.base ic in
             let field_start = Input.pos ic + row_start + offset in
             let n = get_float base ~pos:field_start in
-            Caml.Float.Array.set a i n
+            Stdlib.Float.Array.set a i n
           in
           extract, (name, Column.Floats a)
         | Char | Uchar | Short | Ushort | Int | Uint ->

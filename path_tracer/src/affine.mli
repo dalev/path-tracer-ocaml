@@ -14,7 +14,7 @@ module V3 : sig
     ; z : float
     }
 
-  val pp : Caml.Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
+  val pp : Stdlib.Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
   val create : x:float -> y:float -> z:float -> t
   val x : t -> float
   val y : t -> float
@@ -58,7 +58,7 @@ module P3 : sig
     }
   [@@deriving sexp_of]
 
-  val pp : Caml.Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
+  val pp : Stdlib.Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
   val create : x:float -> y:float -> z:float -> t
   val axis : Axis.t -> t -> float
   val x : t -> float

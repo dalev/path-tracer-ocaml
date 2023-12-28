@@ -8,7 +8,7 @@ type p3 =
 [@@deriving sexp_of]
 
 let to_string { x; y; z } = Printf.sprintf "(%f, %f, %f)" x y z
-let pp f t = Caml.Format.pp_print_string f (to_string t)
+let pp f t = Stdlib.Format.pp_print_string f (to_string t)
 
 module V3 = struct
   type t = p3 =
@@ -50,14 +50,14 @@ module V3 = struct
   end
 
   let[@inline] of_points ~src ~tgt = Infix.( - ) tgt src
-  let[@inline] fma u v w = map3 ~f:Caml.Float.fma u v w
+  let[@inline] fma u v w = map3 ~f:Stdlib.Float.fma u v w
 
   (* These two inlines are to avoid alloc in Bbox.is_hit *)
   let[@inline] min_coord { x; y; z } = Float.min x (Float.min y z)
   let[@inline] max_coord { x; y; z } = Float.max x (Float.max y z)
 
   (* This inline is to reduce alloc in sphere intersect *)
-  let[@inline] dot v w = Caml.Float.fma v.x w.x (Caml.Float.fma v.y w.y (v.z *. w.z))
+  let[@inline] dot v w = Stdlib.Float.fma v.x w.x (Stdlib.Float.fma v.y w.y (v.z *. w.z))
   let[@inline] scale v s = map ~f:(( *. ) s) v
   let[@inline] quadrance v = dot v v
   let lerp t v w = Infix.( + ) (scale v (1.0 -. t)) (scale w t)
@@ -68,7 +68,7 @@ module V3 = struct
   ;;
 
   let cross { x = a; y = b; z = c } { x = d; y = e; z = f } =
-    let[@inline] h w x y z = Caml.Float.fma w x @@ Float.neg (y *. z) in
+    let[@inline] h w x y z = Stdlib.Float.fma w x @@ Float.neg (y *. z) in
     { x = h b f c e; y = h c d a f; z = h a e b d }
   ;;
 end

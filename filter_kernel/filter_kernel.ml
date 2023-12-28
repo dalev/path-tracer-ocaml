@@ -1,5 +1,5 @@
 open! Base
-module FArray = Caml.Float.ArrayLabels
+module FArray = Stdlib.Float.ArrayLabels
 
 let ( .%{} ) = FArray.get
 

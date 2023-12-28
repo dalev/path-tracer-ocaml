@@ -33,7 +33,7 @@ let longest_axis { min; max } =
 let surface_area { min; max } =
   let { P3.x; y; z } = P3.Infix.(max - min) in
   let open Float.O in
-  let a = Caml.Float.fma x y (Caml.Float.fma y z (z * x)) in
+  let a = Stdlib.Float.fma x y (Stdlib.Float.fma y z (z * x)) in
   2.0 * a
 ;;
 

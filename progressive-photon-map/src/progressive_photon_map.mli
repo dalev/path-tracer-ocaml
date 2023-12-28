@@ -11,7 +11,7 @@ module Args : sig
     ; output : string
     }
 
-  val parse : ?specs:(string * Caml.Arg.spec * string) list -> unit -> t
+  val parse : ?specs:(string * Stdlib.Arg.spec * string) list -> unit -> t
 end
 
 module Light : sig

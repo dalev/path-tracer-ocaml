@@ -29,7 +29,7 @@ let write_pixel t ~x ~y color =
     and y = y + dy in
     let[@inline] incr ch v =
       let a = Image.get t.pixels x y ch in
-      Image.set t.pixels x y ch (Caml.Float.fma weight v a)
+      Image.set t.pixels x y ch (Stdlib.Float.fma weight v a)
     in
     let r, g, b = Color.to_rgb color in
     incr 0 r;

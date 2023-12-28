@@ -28,7 +28,7 @@ module Args = struct
     in
     let specs =
       specs
-      @ Caml.Arg.
+      @ Stdlib.Arg.
           [ "-width", Set_int width, "<integer> image width"
           ; "-height", Set_int height, "<integer> image height"
           ; "-iterations", Set_int iterations, "<integer> # photon-map iterations"
@@ -39,7 +39,7 @@ module Args = struct
           ; "-max-bounces", Set_int max_bounces, "<integer> max ray bounces"
           ]
     in
-    Caml.Arg.parse
+    Stdlib.Arg.parse
       specs
       (fun (_ : string) -> failwith "No anonymous arguments expected")
       usage_msg;

@@ -3,7 +3,7 @@ open Stdio
 open Path_tracer
 open Ply_format
 module Bigstring = Base_bigstring
-module FArray = Caml.Float.Array
+module FArray = Stdlib.Float.Array
 module Common_args = Progressive_photon_map.Args
 
 module Args = struct
@@ -17,7 +17,7 @@ module Args = struct
     let stop_after_bvh = ref false in
     let ganesha_ply = ref "ganesha.ply" in
     let specs =
-      Caml.Arg.
+      Stdlib.Arg.
         [ "-ganesha-ply", Set_string ganesha_ply, "<file> path to ganesha.ply"
         ; "-stop-after-bvh", Set stop_after_bvh, "stop after BVH build"
         ]
@@ -192,14 +192,14 @@ let main { Args.common; ganesha_ply; stop_after_bvh } =
     "tree depth = %d\nbuild time = %.3f ms\nreachable words = %d\n%!"
     (Triangles.depth tree)
     (Float.of_int63 elapsed *. 1e-6)
-    (Caml.Obj.reachable_words @@ Caml.Obj.repr tree);
+    (Stdlib.Obj.reachable_words @@ Stdlib.Obj.repr tree);
   printf
     "leaf lengths =\n%s\n%!"
     (Sexp.to_string_hum @@ [%sexp_of: Leaf_lengths.t] (Leaf_lengths.create tree));
   if stop_after_bvh
   then (
     printf "Stop after bvh build\n";
-    Caml.exit 0);
+    Stdlib.exit 0);
   let ganesha_bbox = Triangles.bbox tree in
   printf "ganesha bbox = %s\n" @@ Sexp.to_string_mach ([%sexp_of: Bbox.t] ganesha_bbox);
   let module Floor = struct

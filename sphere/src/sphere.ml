@@ -47,7 +47,7 @@ let intersect { center; radius; _ } ray ~t_min ~t_max =
       (* [Sign.to_float] is not correct here: if the ray origin is precisely the circle center, then b' = 0 *)
       if b' >= 0.0 then 1.0 else -1.0
     in
-    let q = Caml.Float.fma sign_b' (Float.sqrt (a * discrim)) b' in
+    let q = Stdlib.Float.fma sign_b' (Float.sqrt (a * discrim)) b' in
     let c = V3.quadrance f - r2 in
     let t_hit = if c > 0.0 then c / q else q / a in
     if t_min <= t_hit && t_hit <= t_max then Some t_hit else None)

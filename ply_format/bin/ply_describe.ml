@@ -2,7 +2,7 @@ open! Base
 open Stdio
 open Ply_format
 module Bigstring = Base_bigstring
-module FArray = Caml.Float.Array
+module FArray = Stdlib.Float.Array
 module Unix = Core_unix
 
 type p3 = float * float * float [@@deriving sexp_of]
